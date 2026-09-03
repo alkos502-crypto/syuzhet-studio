@@ -725,9 +725,27 @@ function newBlock(kind) {
         kind,                    /* vo | standup | sync | life | spiegel | vod */
         text: "",
         speaker: "", role: "",   /* только sync */
+        folded: false,           /* блок свёрнут в строку (вид, на порядок не влияет) */
         parts: []                /* {file,in,out}; несколько — у standup/sync/life/spiegel */
     };
 }
+/* ---------- режимы вида списка (порядок экспорта — всегда порядок массива) ---------- */
+let blockCols = store.get("ss_cols", 1);
+function setCols(n) {
+    blockCols = n;
+    store.set("ss_cols", n);
+    $("blocks").classList.toggle("cols2", n === 2);
+    $("col1").classList.toggle("on", n === 1);
+    $("col2").classList.toggle("on", n === 2);
+}
+$("col1").onclick = () => setCols(1);
+$("col2").onclick = () => setCols(2);
+$("btnFoldAll").onclick = () => {
+    const fold = state.blocks.some(b => !b.folded);
+    state.blocks.forEach(b => b.folded = fold);
+    renderBlocks(); saveState();
+    toast(fold ? "Все блоки свёрнуты" : "Все блоки развернуты");
+};
 $("btnAddVO").onclick = () => { state.blocks.push(newBlock("vo")); renderBlocks(); saveState(); };
 $("btnAddStandup").onclick = () => { state.blocks.push(newBlock("standup")); renderBlocks(); saveState(); };
 $("btnAddSync").onclick = () => { state.blocks.push(newBlock("sync")); renderBlocks(); saveState(); };
@@ -780,7 +798,7 @@ function renderBlocks() {
     state.blocks.forEach((b, i) => {
         total += partsDur(b);
         const div = document.createElement("div");
-        div.className = "block " + b.kind;
+        div.className = "block " + b.kind + (b.folded ? " folded" : "");
         div.dataset.id = b.id;
         /* сохранённый пользователем размер блока (если менял) */
         if (b.w) div.style.width = b.w;
@@ -790,18 +808,24 @@ function renderBlocks() {
         div.addEventListener("touchend", () => captureBlockSize(b, div));
 
         const dur = partsDur(b);
+        const summary = b.folded
+            ? `<span class="fold-sum">${esc((b.text || "").replace(/\s+/g, " ").trim().slice(0, 40)) || "без текста"}
+                ${b.parts.length ? "· " + b.parts.length + " фр." : ""}${dur ? "· " + durHuman(dur) : ""}</span>`
+            : `<span class="dur">${dur ? "(" + durHuman(dur) + ")" : ""}</span>`;
         div.innerHTML = `
             <div class="block-head">
                 <span class="drag-h" draggable="true" title="Перетащите, чтобы изменить порядок">⠿</span>
                 <span class="num">${i + 1}.</span>
                 <span class="kind">${esc(blockTitle(b, nums[b.id]))}</span>
-                <span class="dur">${dur ? "(" + durHuman(dur) + ")" : ""}</span>
+                ${summary}
                 <span class="spacer"></span>
+                <button class="icon-btn fold-btn" data-act="fold" title="Свернуть / развернуть">${b.folded ? "▸" : "▾"}</button>
                 <button class="icon-btn" data-act="up"  title="Выше">↑</button>
                 <button class="icon-btn" data-act="down" title="Ниже">↓</button>
                 <button class="icon-btn" data-act="dup" title="Дублировать">⧉</button>
                 <button class="icon-btn" data-act="del" title="Удалить">✕</button>
             </div>
+            <div class="block-body" ${b.folded ? "hidden" : ""}>
             ${b.kind === "sync" ? `
                 <div class="row">
                     <input class="b-speaker" placeholder="Спикер — ФИО" value="${esc(b.speaker)}">
@@ -814,6 +838,7 @@ function renderBlocks() {
             ${b.kind === "vod" ? "" : `
             <div class="parts"></div>
             <div class="row"><button class="add-part">+ файл/фрагмент</button></div>`}
+            </div>
         `;
         const partsHost = div.querySelector(".parts");
         b.parts.forEach((p, pi) => {
@@ -867,6 +892,7 @@ function renderBlocks() {
             if (!act) return;
             if (act === "up" && i > 0) [state.blocks[i - 1], state.blocks[i]] = [b, state.blocks[i - 1]];
             if (act === "down" && i < state.blocks.length - 1) [state.blocks[i + 1], state.blocks[i]] = [b, state.blocks[i + 1]];
+            if (act === "fold") b.folded = !b.folded;
             if (act === "dup") state.blocks.splice(i + 1, 0, JSON.parse(JSON.stringify({ ...b, id: state.nextId++ })));
             if (act === "del") {
                 if (!confirm("Удалить блок «" + blockTitle(b, nums[b.id]) + "» со всеми фрагментами?")) return;
@@ -1107,6 +1133,7 @@ function normalizeBlocks(arr) {
             role: typeof b.role === "string" ? b.role : "",
             w: typeof b.w === "string" ? b.w : "",
             h: typeof b.h === "string" ? b.h : "",
+            folded: !!b.folded,
             parts: (b.kind === "vod" || !Array.isArray(b.parts) ? [] : b.parts)
                 .filter(p => p && typeof p.file === "string" &&
                              Number.isFinite(+p.in) && Number.isFinite(+p.out) && +p.out > +p.in && +p.in >= 0)
@@ -1159,6 +1186,7 @@ $("csvSep").addEventListener("change", () => store.set("ss_sep", $("csvSep").val
    (refreshNameSelects сохранит восстановленный выбор) */
 loadSharedNames(refreshNameSelects);
 setView(viewMode);          /* применить сохранённый вид списка и подсветку кнопок */
+setCols(blockCols);         /* сохранённый вид списка блоков (1/2 колонки) */
 if (!loadDraftData({ blocks: store.get("ss_blocks", []), nextId: store.get("ss_nextId", 1) }))
     renderBlocks();
 const savedDir = store.get("ss_dirname", "");

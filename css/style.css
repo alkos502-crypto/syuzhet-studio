@@ -78,6 +78,9 @@ body.dragging.col { cursor: col-resize; }
 #blocks {
     display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
 }
+/* вид «две колонки» — только отображение, порядок экспорта = порядок списка */
+#blocks.cols2 { flex-flow: row wrap; }
+#blocks.cols2 .block { width: calc(50% - 5px) !important; height: auto !important; resize: none; }
 .block {
     background: var(--card); border: 1px solid var(--line); border-radius: 6px;
     margin: 0; padding: 10px 12px;
@@ -115,6 +118,11 @@ body.dragging.col { cursor: col-resize; }
     padding: 2px 8px; font-size: 13px; background: transparent; border: none;
 }
 .block .parts { margin-top: 8px; }
+/* свёрнутый блок — одна строка-шапка */
+.block.folded { min-height: 0; height: auto !important; padding: 6px 12px; resize: none; }
+.fold-sum { color: var(--muted); font-size: 12px; font-weight: 400;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.fold-btn { font-size: 11px !important; }
 .part {
     display: flex; gap: 6px; align-items: center; margin: 4px 0;
     background: #1b1c1f; border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px;
