@@ -835,7 +835,7 @@ function renderBlocks() {
                 b.kind === "life" ? "Комментарий к лайфу (что в кадре, звук)…" :
                 b.kind === "spiegel" ? "Текст шпигеля…" :
                 b.kind === "vod" ? "Текст подводки…" : "Текст…"}">${esc(b.text)}</textarea>
-            ${b.kind === "vod" ? "" : `
+            ${b.kind === "vod" || b.kind === "vo" ? "" : `
             <div class="parts"></div>
             <div class="row"><button class="add-part">+ файл/фрагмент</button></div>`}
             </div>
@@ -871,8 +871,6 @@ function renderBlocks() {
         });
         const addPartBtn = div.querySelector(".add-part");
         if (addPartBtn) addPartBtn.onclick = () => {
-            if (b.kind === "vo" && b.parts.length >= 1)
-                return toast("У закадра один фрагмент. Для нескольких кусков сделайте синхрон или новый блок.", "err");
             if (!curFile) return toast("Сначала разметьте фрагмент в плеере", "err");
             if (markIn === null || markOut === null)
                 return toast("Поставьте метки входа и выхода (I / O)", "err");
@@ -947,7 +945,7 @@ function refreshTargets() {
     let html = `<option value="${NEW_TARGET}">+ новый: ${esc(modeTxt)}</option>`;
     html += state.blocks.map(b => {
         const t = blockTitle(b, nums[b.id]);
-        const can = b.kind !== "vod" && (b.kind !== "vo" || b.parts.length === 0);
+        const can = b.kind !== "vod" && b.kind !== "vo";
         return `<option value="${b.id}" ${can ? "" : "disabled"}>${esc(t)}</option>`;
     }).join("");
     sel.innerHTML = html;
@@ -963,9 +961,9 @@ $("btnSend").addEventListener("click", () => {
     if ($("targetBlock").value === NEW_TARGET) {
         const kind = $("sendMode").value;
         const b = newBlock(kind);
-        if (kind === "vod") {
+        if (kind === "vod" || kind === "vo") {
             state.blocks.push(b); renderBlocks(); saveState();
-            return toast("Блок «Подводка» создан — видеофрагменты в него не добавляются", "warn");
+            return toast("Блок «" + blockTitle(b, typeNumbers()[b.id]) + "» создан — это только текст, фрагмент не добавлен", "warn");
         }
         if (vf) dupWarning(vf);
         b.parts.push({ file: curFile, in: markIn, out: markOut });
@@ -978,8 +976,7 @@ $("btnSend").addEventListener("click", () => {
     const b = state.blocks.find(x => x.id === id);
     if (!b) return toast("Выберите блок", "err");
     if (b.kind === "vod") return toast("У подводки нет видеофрагментов", "err");
-    if (b.kind === "vo" && b.parts.length >= 1)
-        return toast("В закадровом блоке уже есть фрагмент", "err");
+    if (b.kind === "vo") return toast("Блок ЗК — только текст. Фрагменты — в синхрон, стендап, лайф или шпигель", "err");
     if (vf) dupWarning(vf);
     b.parts.push({ file: curFile, in: markIn, out: markOut });
     const nums = typeNumbers();
@@ -1028,7 +1025,6 @@ function buildCsv() {
             L.push("#");
             L.push("# ——— ЗАКАДР " + voN + " ———");
             b.text.split(/\r?\n/).forEach(t => L.push("# " + t));
-            (b.parts || []).forEach(p => L.push(row(p.file, tc(p.in), tc(p.out), "ЗК" + voN)));
         } else if (b.kind === "standup") {
             suN++;
             L.push("#");
@@ -1134,7 +1130,7 @@ function normalizeBlocks(arr) {
             w: typeof b.w === "string" ? b.w : "",
             h: typeof b.h === "string" ? b.h : "",
             folded: !!b.folded,
-            parts: (b.kind === "vod" || !Array.isArray(b.parts) ? [] : b.parts)
+            parts: ((b.kind === "vod" || b.kind === "vo") || !Array.isArray(b.parts) ? [] : b.parts)
                 .filter(p => p && typeof p.file === "string" &&
                              Number.isFinite(+p.in) && Number.isFinite(+p.out) && +p.out > +p.in && +p.in >= 0)
                 .map(p => ({ file: p.file, in: +p.in, out: +p.out }))
