@@ -986,7 +986,10 @@ $("btnSend").addEventListener("click", () => {
 
 /* ---------- горячие клавиши плеера ---------- */
 document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && !$("namesModal").hidden) { closeNmModal(); return; }
+    if (e.key === "Escape") {
+        if (!$("wordModal").hidden) { closeWordReview(); return; }
+        if (!$("namesModal").hidden) { closeNmModal(); return; }
+    }
     const inField = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "");
     if (inField) return;
     const p = $("player");
@@ -1169,6 +1172,269 @@ $("draftFile").onchange = e => {
     rd.readAsText(f);
     e.target.value = "";
 };
+
+/* ---------- импорт правок редактора из Word (тексты блоков) ---------- */
+$("btnImportWord").onclick = () => $("wordFile").click();
+$("wordFile").onchange = e => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (f) importWordFile(f);
+};
+
+/* заголовки блоков, как их печатает buildDoc (нумерация — по типу) */
+function parseWordHead(h) {
+    let m;
+    if (/^закадр/i.test(h) || /^зк[\s.]/i.test(h)) {
+        const d = h.match(/\d+/);
+        return { kind: "vo", num: d ? +d[0] : NaN };
+    }
+    if ((m = h.match(/^стендап\s*(\d+)/i))) return { kind: "standup", num: +m[1] };
+    if ((m = h.match(/^лайф\s*(\d+)/i))) return { kind: "life", num: +m[1] };
+    if (/^шпигель/i.test(h)) return { kind: "spiegel" };
+    if (/^подводка/i.test(h)) return { kind: "vod" };
+    if ((m = h.match(/^синхрон\s*(\d+)\s*[.．]?\s*(.*)$/i))) {
+        const parts = (m[2] || "").split(/[,;]/);
+        return { kind: "sync", num: +m[1],
+                 speaker: (parts.shift() || "").replace(/^—+\s*/, "").trim(),
+                 role: parts.join(", ").trim() };
+    }
+    return null;
+}
+function normWs(s) { return (s || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim(); }
+/* текст блочного элемента: <br> → перевод строки, остальное — в одну строку */
+function blockLineText(el) {
+    const c = el.cloneNode(true);
+    c.querySelectorAll("br").forEach(b => b.replaceWith("\u0001"));
+    return normWs(c.textContent).replace(/\u0001/g, "\n").trim();
+}
+/* из последовательности «заголовок + абзацы» — список блоков документа */
+function wordItemsToBlocks(items) {
+    const blocks = [], unknown = [];
+    items.forEach(it => {
+        const key = parseWordHead(it.head);
+        if (key) blocks.push(Object.assign({ text: it.lines.join("\n") }, key));
+        else unknown.push(it.head);
+    });
+    return { blocks, unknown };
+}
+/* наш .doc (он же HTML), в т.ч. пересохранённый Word (классы MsoHeading…) */
+function parseWordHtml(text) {
+    const dom = new DOMParser().parseFromString(text, "text/html");
+    const BLK = "h1,h2,h3,h4,h5,h6,p,li";
+    const nodes = [...dom.querySelectorAll(BLK)].filter(el => !el.querySelector(BLK));
+    [...dom.querySelectorAll("[class]")].forEach(el => {
+        if (/heading/i.test(el.className) && !nodes.includes(el) && !el.querySelector(BLK)) nodes.push(el);
+    });
+    const items = [];
+    let cur = null;
+    for (const el of nodes) {
+        const isHead = /^H[1-6]$/.test(el.tagName) || /heading/i.test(el.className || "");
+        const txt = isHead ? normWs(el.textContent) : blockLineText(el);
+        if (!txt) continue;
+        if (isHead) { cur = { head: txt, lines: [] }; items.push(cur); }
+        else if (cur) cur.lines.push(txt);
+    }
+    return wordItemsToBlocks(items);
+}
+/* минимальный zip-ридер для word/document.xml внутри .docx */
+async function docunzip(buf, wantName) {
+    const dv = new DataView(buf), te = new TextDecoder();
+    let eocd = -1;
+    for (let i = buf.byteLength - 22; i >= 0 && i > buf.byteLength - 66000; i--)
+        if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    if (eocd < 0) throw new Error("повреждён zip-архив");
+    let off = dv.getUint32(eocd + 16, true);
+    const count = dv.getUint16(eocd + 10, true);
+    for (let n = 0; n < count; n++) {
+        if (dv.getUint32(off, true) !== 0x02014b50) break;
+        const method = dv.getUint16(off + 10, true), csize = dv.getUint32(off + 20, true);
+        const nlen = dv.getUint16(off + 28, true), xlen = dv.getUint16(off + 30, true),
+              clen = dv.getUint16(off + 32, true), loff = dv.getUint32(off + 42, true);
+        const name = te.decode(new Uint8Array(buf, off + 46, nlen));
+        if (name === wantName) {
+            const lnlen = dv.getUint16(loff + 26, true), lxlen = dv.getUint16(loff + 28, true);
+            const comp = new Uint8Array(buf, loff + 30 + lnlen + lxlen, csize);
+            if (method === 0) return te.decode(comp);
+            const out = new Blob([comp]).stream()
+                .pipeThrough(new DecompressionStream("deflate-raw"));
+            return te.decode(await new Response(out).arrayBuffer());
+        }
+        off += 46 + nlen + xlen + clen;
+    }
+    throw new Error("внутри нет word/document.xml");
+}
+/* текст w:p: w:t → строки, w:br/w:cr → перевод строки */
+function docxParaText(p) {
+    let out = "";
+    const walk = n => {
+        for (const c of n.childNodes) {
+            if (c.nodeName === "w:t") out += c.textContent;
+            else if (c.nodeName === "w:br" || c.nodeName === "w:cr") out += "\u0001";
+            else if (c.nodeType === 1) walk(c);
+        }
+    };
+    walk(p);
+    return normWs(out).replace(/\u0001/g, "\n").trim();
+}
+async function parseDocx(arrayBuf) {
+    const b = new Uint8Array(arrayBuf);
+    if (b[0] !== 0x50 || b[1] !== 0x4b) throw new Error("это не zip (не похоже на .docx)");
+    if (typeof DecompressionStream === "undefined")
+        throw new Error("браузер не умеет читать .docx — сохраните файл как .doc");
+    const xml = await docunzip(arrayBuf, "word/document.xml");
+    const doc = new DOMParser().parseFromString(xml, "text/xml");
+    const items = [];
+    let cur = null;
+    [...doc.getElementsByTagName("w:p")].forEach(p => {
+        const st = p.getElementsByTagName("w:pStyle")[0];
+        const style = st ? (st.getAttribute("w:val") || "") : "";
+        const text = docxParaText(p);
+        if (!text) return;
+        if (/heading/i.test(style)) { cur = { head: normWs(text), lines: [] }; items.push(cur); }
+        else if (cur) cur.lines.push(text);
+    });
+    return wordItemsToBlocks(items);
+}
+/* если UTF-8 прочитался «кракозябрами» без кириллицы — перечитать в windows-1251 */
+function readAsTextSmart(f) {
+    return new Promise((res, rej) => {
+        const rd = new FileReader();
+        rd.onerror = () => rej(new Error("файл не читается"));
+        rd.onload = () => {
+            const s = rd.result || "";
+            const cyr = (s.match(/[а-яёА-ЯЁ]/g) || []).length;
+            /* мало кириллицы + следы битого UTF-8/латиницы → вероятно, windows-1251 */
+            if (cyr < 20 && /\uFFFD|[\u0591-\u07BF]|[À-ÿ]/.test(s)) {
+                const rd2 = new FileReader();
+                rd2.onload = () => res(rd2.result);
+                rd2.onerror = () => res(s);
+                rd2.readAsText(f, "windows-1251");
+            } else res(s);
+        };
+        rd.readAsText(f, "utf-8");
+    });
+}
+async function importWordFile(f) {
+    try {
+        const parsed = /\.docx$/i.test(f.name)
+            ? await parseDocx(await f.arrayBuffer())
+            : parseWordHtml(await readAsTextSmart(f));
+        if (!parsed.blocks.length) {
+            toast("В файле нет знакомых заголовков («Закадровый текст 1», «Синхрон 2…»)", "err");
+            return;
+        }
+        openWordReview(parsed);
+    } catch (e) {
+        toast("Файл не прочитан: " + e.message, "err");
+    }
+}
+
+let wordPlan = null;   /* {rows, fresh, unknown} */
+function buildWordPlan(parsed) {
+    const nums = typeNumbers();
+    const used = new Set(), rows = [], fresh = [];
+    parsed.blocks.forEach(it => {
+        const free = state.blocks.filter(x => x.kind === it.kind && !used.has(x.id));
+        let b;
+        if (Number.isFinite(it.num)) b = free.find(x => nums[x.id] === it.num);
+        if (!b && (it.kind === "spiegel" || it.kind === "vod")) b = free[0];
+        if (!b && it.kind === "sync" && it.speaker)          /* подстраховка: поиск по спикеру */
+            b = free.find(x => normWs(x.speaker).toLowerCase() === it.speaker.toLowerCase());
+        if (!b) { fresh.push(it); return; }
+        used.add(b.id);
+        const textChanged = normWs(it.text) !== normWs(b.text);
+        const speakerChanged = b.kind === "sync" && it.speaker && normWs(it.speaker) !== normWs(b.speaker);
+        const roleChanged = b.kind === "sync" && it.role && normWs(it.role) !== normWs(b.role);
+        rows.push({ b, it, removed: false, changed: textChanged || speakerChanged || roleChanged,
+                    textChanged, speakerChanged, roleChanged });
+    });
+    state.blocks.forEach(b => { if (!used.has(b.id)) rows.push({ b, it: null, removed: false, changed: false, missing: true }); });
+    rows.sort((x, y) => state.blocks.indexOf(x.b) - state.blocks.indexOf(y.b));
+    return { rows, fresh, unknown: parsed.unknown || [] };
+}
+function openWordReview(parsed) {
+    wordPlan = buildWordPlan(parsed);
+    $("wordModal").hidden = false;
+    renderWordReview();
+}
+function closeWordReview() { $("wordModal").hidden = true; wordPlan = null; }
+function wmChangedCount() {
+    return wordPlan ? wordPlan.rows.filter(r => r.changed && !r.removed).length : 0;
+}
+function renderWordReview() {
+    if (!wordPlan) return;
+    const p = wordPlan;
+    $("wmSummary").textContent =
+        "Изменено: " + wmChangedCount() + "  ·  без изменений: " +
+        p.rows.filter(r => !r.changed && !r.removed && !r.missing).length +
+        "  ·  нет в Word: " + p.rows.filter(r => r.missing).length +
+        "  ·  новых в Word (не импортируются): " + p.fresh.length;
+    const onlyChanged = $("wmOnlyChanged").checked;
+    const host = $("wmList");
+    host.innerHTML = "";
+    p.rows.forEach((r, ri) => {
+        if (onlyChanged && !r.changed && !r.missing) return;
+        const el = document.createElement("div");
+        el.className = "wm-row" + (r.changed ? " ch" : "") + (r.missing ? " miss" : "");
+        const title = blockTitle(r.b, typeNumbers()[r.b.id]);
+        const bits = [];
+        if (r.textChanged) bits.push("текст");
+        if (r.speakerChanged) bits.push("спикер");
+        if (r.roleChanged) bits.push("должность");
+        el.innerHTML = `
+            <div class="wm-row-head">
+                <span class="wm-title">${esc(title)}</span>
+                <span class="wm-tag">${r.missing ? "нет в правке Word" : bits.length ? esc(bits.join(" · ")) : "без изменений"}</span>
+                ${r.missing ? `<label class="wm-del"><input type="checkbox" data-wm="del" data-ri="${ri}"> удалить блок</label>` : ""}
+                <span class="spacer"></span>
+                <button class="icon-btn" data-wm="exp" title="Показать/скрыть тексты">…</button>
+            </div>
+            ${r.changed ? `<div class="wm-diff" hidden>
+                <div><h4>в сюжете сейчас</h4><pre>${esc(r.b.text || "—")}</pre></div>
+                <div><h4>в Word</h4><pre>${esc(r.it && r.it.text || "—")}</pre></div>
+            </div>` : ""}
+        `;
+        el.querySelector('[data-wm=exp]').onclick = () => {
+            const d = el.querySelector(".wm-diff");
+            if (d) d.hidden = !d.hidden;
+        };
+        const del = el.querySelector('[data-wm=del]');
+        if (del) del.onchange = () => { r.removed = del.checked; updateWmApply(); };
+        host.appendChild(el);
+    });
+    if (!host.children.length)
+        host.innerHTML = '<div class="muted" style="padding:8px">Отличий нет — правки совпадают с сюжетом.</div>';
+    updateWmApply();
+}
+function updateWmApply() {
+    const nDel = wordPlan ? wordPlan.rows.filter(r => r.removed).length : 0;
+    const btn = $("wmApply");
+    btn.disabled = !(wmChangedCount() + nDel);
+    btn.textContent = nDel ? "Применить (тексты + удалить " + nDel + ")" : "Применить";
+}
+$("wmApply").onclick = () => {
+    if (!wordPlan) return;
+    const nums = typeNumbers();
+    let upd = 0;
+    const toDelete = [];
+    wordPlan.rows.forEach(r => {
+        if (r.removed) { toDelete.push(r.b.id); return; }
+        if (!r.changed) return;
+        if (r.textChanged) r.b.text = r.it.text;
+        if (r.speakerChanged) r.b.speaker = r.it.speaker;
+        if (r.roleChanged) r.b.role = r.it.role;
+        upd++;
+    });
+    if (toDelete.length) state.blocks = state.blocks.filter(b => !toDelete.includes(b.id));
+    closeWordReview();
+    renderBlocks(); saveState();
+    toast("Правки применены: обновлено " + upd + " блок(ов)" +
+          (toDelete.length ? ", удалено " + toDelete.length : ""), "ok");
+};
+$("wmCancel").onclick = closeWordReview;
+$("wmClose").onclick = closeWordReview;
+$("wmOnlyChanged").onchange = renderWordReview;
+$("wordModal").addEventListener("mousedown", e => { if (e.target === $("wordModal")) closeWordReview(); });
 
 /* ---------- старт ---------- */
 loadReq();
