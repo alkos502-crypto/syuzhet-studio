@@ -73,30 +73,100 @@ main {
 body.dragging { user-select: none; }
 body.dragging.col { cursor: col-resize; }
 
-/* блоки сценария — один столбец, новые добавляются внизу;
-   размер блока тянет пользователь за правый нижний угол (вниз и вправо) */
+/* =================== ДОКУМЕНТ (режим «печатная машинка») ===================
+   Сценарий — белая «бумага» по центру; блоки — строки текста без карточек.
+   Метка типа — на полях слева (как стили абзацев в Word), текст — авторастущий. */
+main { padding: 0 16px 40px; }
+#left { max-width: 860px; margin: 0 auto; }
 #blocks {
-    display: flex; flex-direction: column; gap: 10px; align-items: flex-start;
+    display: block;
+    background: #f7f5ef; color: #1e1e1e;
+    border: 1px solid #cfc9bc; border-radius: 3px;
+    box-shadow: 0 6px 26px rgba(0,0,0,.35);
+    padding: 34px 46px 46px; min-height: 60vh;
+    font-family: Georgia, "Times New Roman", "PT Serif", serif;
 }
-/* вид «две колонки» — только отображение, порядок экспорта = порядок списка */
-#blocks.cols2 { flex-flow: row wrap; }
-#blocks.cols2 .block { width: calc(50% - 5px) !important; height: auto !important; resize: none; }
-.block {
-    background: var(--card); border: 1px solid var(--line); border-radius: 6px;
-    margin: 0; padding: 10px 12px;
-    width: 100%; height: auto;
-    resize: both; overflow: auto;
-    min-width: 280px; max-width: 100%;
-    min-height: 90px;
+#blocks .empty-hint { color: #9a9384; font-size: 14px; font-style: italic; }
+.doc-block { position: relative; margin: 0 0 16px; padding-left: 118px; }
+.doc-label {
+    position: absolute; left: 0; top: 1px; width: 108px;
+    display: flex; align-items: baseline; gap: 4px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    font-size: 11px; font-weight: 700; letter-spacing: .02em; color: #6b7280;
 }
-.block.vo    { border-left: 4px solid #3d7bb0; }
-.block.standup { border-left: 4px solid #8a5bb0; }
-.block.sync  { border-left: 4px solid #b08a3d; }
-.block.life  { border-left: 4px solid #3d9f6e; }
-.block.spiegel { border-left: 4px solid #b05a3d; }
-.block.vod   { border-left: 4px solid #3d9fb0; }
+.doc-label .dot { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto; align-self: center; }
+.doc-label .lbl { text-transform: uppercase; }
+.doc-label .dur { color: #9aa0a6; font-weight: 400; margin-left: auto; }
+.doc-tools {
+    position: absolute; right: 0; top: 0; display: flex; gap: 2px;
+    opacity: 0; transition: opacity .12s;
+}
+.doc-block:hover .doc-tools { opacity: 1; }
+.doc-tools button {
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    background: #ece8dd; border: 1px solid #d7d1c3; color: #555; border-radius: 3px;
+    padding: 0 5px; font-size: 12px; line-height: 18px; cursor: pointer;
+}
+.doc-tools button:hover { background: #e0dac9; }
+.doc-fold {
+    position: absolute; left: 96px; top: 1px; cursor: pointer; color: #b3ac9c;
+    font-size: 12px; user-select: none; font-family: -apple-system, sans-serif;
+}
+.doc-text {
+    display: block; width: 100%; box-sizing: border-box;
+    border: none; background: transparent; outline: none; resize: none; overflow: hidden;
+    font-family: inherit; font-size: 17px; line-height: 1.55; color: #16160f;
+    padding: 1px 0; min-height: 26px; margin: 0;
+}
+.doc-text::placeholder { color: #b4ac9a; font-style: italic; }
+.doc-block:focus-within .doc-text { background: rgba(45,106,159,.045); box-shadow: 0 0 0 3px rgba(45,106,159,.045); border-radius: 2px; }
+/* sync: спикер и должность — прямо в строке, «как текст» */
+.doc-sync-head { display: flex; gap: 6px; align-items: baseline; margin: 0 0 2px; }
+.doc-sync-head input {
+    border: none; background: transparent; outline: none; padding: 0;
+    font-family: inherit; font-size: 16px; color: #16160f; border-bottom: 1px dotted #b8b0a0;
+}
+.doc-sync-head input.b-speaker { font-weight: 700; width: 240px; }
+.doc-sync-head input.b-role { font-style: italic; color: #555; width: 240px; }
+.doc-sync-head input:focus { border-bottom-color: var(--accent); }
+/* части (фрагменты) */
+.doc-parts { margin: 4px 0 0; font-family: ui-monospace, Menlo, monospace; }
+.doc-part {
+    display: flex; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 3px;
+    font-size: 13px; color: #243; background: rgba(0,0,0,.035); border: 1px solid transparent;
+}
+.doc-part + .doc-part { margin-top: 3px; }
+.doc-part:hover { border-color: #cfc9b8; }
+.doc-part .file { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f2937; }
+.doc-part .tc { color: #6b7280; }
+.doc-part button { background: none; border: none; cursor: pointer; color: #7a7365; font-size: 12px; padding: 0 3px; }
+.doc-part button:hover { color: #111; }
+.doc-pull {
+    margin-top: 3px; padding: 3px 6px; border: 1px dashed #b8b0a0; border-radius: 3px;
+    font-family: -apple-system, sans-serif; font-size: 12px; color: #7a7365; cursor: pointer;
+    background: transparent; width: 100%; text-align: left;
+}
+.doc-pull:hover { border-color: var(--accent); color: var(--accent); background: rgba(45,106,159,.06); }
+/* свёрнутый блок */
+.doc-block.folded .doc-body { display: none; }
+.doc-block.folded { margin-bottom: 6px; }
+.doc-foldsum { font-family: -apple-system, sans-serif; font-size: 12px; color: #9a9384; font-style: italic; }
+/* цвета меток типов */
+.doc-block.vo      .dot { background: #3d7bb0; } .doc-block.vo .lbl { color: #2f5f8a; }
+.doc-block.standup .dot { background: #8a5bb0; } .doc-block.standup .lbl { color: #6d4591; }
+.doc-block.sync    .dot { background: #b08a3d; } .doc-block.sync .lbl { color: #8a6c2c; }
+.doc-block.life    .dot { background: #3d9f6e; } .doc-block.life .lbl { color: #2f7d56; }
+.doc-block.spiegel .dot { background: #b05a3d; } .doc-block.spiegel .lbl { color: #8f4730; }
+.doc-block.vod     .dot { background: #3d9fb0; } .doc-block.vod .lbl { color: #2f7d8a; }
 
-/* кнопки добавления блоков — в цвет полосы соответствующего блока */
+/* панель поиска и индикатор текущего блока */
+.findbar { display: flex; align-items: center; gap: 8px; max-width: 860px; margin: 0 auto 10px;
+           background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+.findbar input { background: #14151a; }
+.findbar button { padding: 2px 10px; }
+.cur-block { font-size: 12px; color: var(--ok); font-weight: 600; min-width: 92px; }
+
+/* кнопки добавления блоков — в цвет метки соответствующего типа */
 .btn-vo      { background: #3d7bb0; border-color: #5a95c4; }
 .btn-standup { background: #8a5bb0; border-color: #a37ac2; }
 .btn-sync    { background: #b08a3d; border-color: #c4a35d; }
@@ -105,31 +175,6 @@ body.dragging.col { cursor: col-resize; }
 .btn-vod     { background: #3d9fb0; border-color: #5cb5c4; }
 .btn-vo:hover, .btn-standup:hover, .btn-sync:hover, .btn-life:hover,
 .btn-spiegel:hover, .btn-vod:hover { filter: brightness(1.12); }
-.block-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.block-head .drag-h { cursor: grab; color: var(--muted); font-size: 14px; user-select: none; }
-.block-head .drag-h:active { cursor: grabbing; }
-.block.drag-src { opacity: .45; }
-.block.drop-above { box-shadow: 0 -3px 0 0 var(--accent); }
-.block.drop-below { box-shadow: 0 3px 0 0 var(--accent); }
-.block-head .kind { font-weight: 600; }
-.block-head .num { color: var(--muted); }
-.block-head .dur { color: var(--ok); font-size: 12px; }
-.block-head .icon-btn {
-    padding: 2px 8px; font-size: 13px; background: transparent; border: none;
-}
-.block .parts { margin-top: 8px; }
-/* свёрнутый блок — одна строка-шапка */
-.block.folded { min-height: 0; height: auto !important; padding: 6px 12px; resize: none; }
-.fold-sum { color: var(--muted); font-size: 12px; font-weight: 400;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
-.fold-btn { font-size: 11px !important; }
-.part {
-    display: flex; gap: 6px; align-items: center; margin: 4px 0;
-    background: #1b1c1f; border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px;
-}
-.part .file { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.part .tc { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--muted); }
-.part button { padding: 1px 7px; font-size: 12px; }
 
 /* монитор в стиле Source Monitor */
 .monitor { border: 1px solid var(--line); border-radius: 4px; padding: 8px; background: #17181a; }

@@ -106,11 +106,14 @@
                     <li>I / O — In / Out; Shift+I / Shift+O — перейти к метке</li>
                     <li>← → — шаг на кадр; Shift+← → — на секунду</li>
                     <li>Пробел — пауза; P — циклический предпросмотр In→Out</li>
-                    <li>Esc — очистить поиск по файлам</li>
+                    <li>В тексте блока: Alt+↑/↓ — переместить; Alt+Enter — вставить фрагмент из плеера</li>
+                    <li>Новая строка: «зк», «синх», «стенд», «лайф», «шпи», «подв» + пробел — новый блок</li>
+                    <li>Ctrl+F — поиск; Ctrl+Z / Ctrl+Shift+Z — отменить/вернуть; Esc — закрыть поиск</li>
                 </ul>
             </details>
 
             <div class="row send">
+                <span id="curBlock" class="cur-block" title="Блок, в который печатаете, — цель по умолчанию"></span>
                 <label>В блок:</label>
                 <select id="targetBlock"></select>
                 <label>как</label>
@@ -154,12 +157,16 @@
             <button id="btnAddSync" class="btn-sync">+ Синхрон</button>
             <button id="btnAddLife" class="btn-life">+ Лайф</button>
             <span class="spacer"></span>
-            <span class="view-toggle" title="Вид списка блоков">
-                <button id="col1" title="Одна колонка">▮</button>
-                <button id="col2" title="Две колонки">▮▮</button>
-            </span>
+            <button id="btnFind" title="Поиск по тексту сюжета (Ctrl+F)">🔍 Поиск</button>
             <button id="btnFoldAll" title="Свернуть / развернуть все блоки">⤡ все</button>
             <span id="totalDur" class="muted"></span>
+        </div>
+        <div id="findBar" class="findbar" hidden>
+            <input id="findInput" type="search" placeholder="Поиск по сюжету…  (Enter — далее, Shift+Enter — назад, Esc — закрыть)" style="flex:1; min-width:0">
+            <span id="findCount" class="muted"></span>
+            <button id="findPrev" title="Предыдущее (Shift+Enter)">↑</button>
+            <button id="findNext" title="Следующее (Enter)">↓</button>
+            <button id="findClose" title="Закрыть (Esc)">✕</button>
         </div>
         <div id="blocks"></div>
     </section>

@@ -709,16 +709,6 @@ function updateMarks() {
 }
 
 /* ---------- блоки сценария ---------- */
-/* drag&drop-перестановка блоков за ручку «⠿» */
-let dragId = null, dropBefore = false;
-function clearDrag() {
-    dragId = null; dropBefore = false;
-    document.body.classList.remove("dragging");
-    document.querySelectorAll(".drop-above,.drop-below,.drag-src")
-        .forEach(el => el.classList.remove("drop-above", "drop-below", "drag-src"));
-}
-document.addEventListener("dragend", clearDrag);
-
 function newBlock(kind) {
     return {
         id: state.nextId++,
@@ -729,29 +719,26 @@ function newBlock(kind) {
         parts: []                /* {file,in,out}; несколько — у standup/sync/life/spiegel */
     };
 }
-/* ---------- режимы вида списка (порядок экспорта — всегда порядок массива) ---------- */
-let blockCols = store.get("ss_cols", 1);
-function setCols(n) {
-    blockCols = n;
-    store.set("ss_cols", n);
-    $("blocks").classList.toggle("cols2", n === 2);
-    $("col1").classList.toggle("on", n === 1);
-    $("col2").classList.toggle("on", n === 2);
-}
-$("col1").onclick = () => setCols(1);
-$("col2").onclick = () => setCols(2);
 $("btnFoldAll").onclick = () => {
     const fold = state.blocks.some(b => !b.folded);
     state.blocks.forEach(b => b.folded = fold);
     renderBlocks(); saveState();
     toast(fold ? "Все блоки свёрнуты" : "Все блоки развернуты");
 };
-$("btnAddVO").onclick = () => { state.blocks.push(newBlock("vo")); renderBlocks(); saveState(); };
-$("btnAddStandup").onclick = () => { state.blocks.push(newBlock("standup")); renderBlocks(); saveState(); };
-$("btnAddSync").onclick = () => { state.blocks.push(newBlock("sync")); renderBlocks(); saveState(); };
-$("btnAddLife").onclick = () => { state.blocks.push(newBlock("life")); renderBlocks(); saveState(); };
-$("btnAddSpiegel").onclick = () => { state.blocks.push(newBlock("spiegel")); renderBlocks(); saveState(); };
-$("btnAddVod").onclick = () => { state.blocks.push(newBlock("vod")); renderBlocks(); saveState(); };
+function addAndFocus(kind) {
+    histBefore();
+    const b = newBlock(kind);
+    state.blocks.push(b);
+    renderBlocks(); saveState(); refreshTargets();
+    focusBlock(b.id, 0);
+    setCurrentBlock(b.id);
+}
+$("btnAddVO").onclick = () => addAndFocus("vo");
+$("btnAddStandup").onclick = () => addAndFocus("standup");
+$("btnAddSync").onclick = () => addAndFocus("sync");
+$("btnAddLife").onclick = () => addAndFocus("life");
+$("btnAddSpiegel").onclick = () => addAndFocus("spiegel");
+$("btnAddVod").onclick = () => addAndFocus("vod");
 
 /* заголовок блока. n — номер ПО ТИПУ (1-й закадр = «ЗК 1»,
    2-й синхрон = «Синхрон 2»), не позиция в сценарии.
@@ -773,14 +760,6 @@ function typeNumbers() {
 function partsDur(b) {
     return b.parts.reduce((s, p) => s + ((p.out ?? 0) - (p.in ?? 0)), 0);
 }
-/* размер блока, изменённый пользователем через resize-ручку */
-function captureBlockSize(b, div) {
-    const w = div.style.width, h = div.style.height;
-    if ((w && w !== b.w) || (h && h !== b.h)) {
-        b.w = w; b.h = h;
-        saveState();
-    }
-}
 /* предупреждение о дублях: имя файла встречается в нескольких подпапках */
 function dupWarning(file) {
     const dups = videoFiles.filter(v => v.name === file.name);
@@ -789,68 +768,205 @@ function dupWarning(file) {
               dups.map(d => d.relPath).join("; ") + "). Добавлен: " + file.relPath, "warn");
 }
 
+/* ---------- «печатная машинка»: набор текста как в Word ---------- */
+/* триггеры нового блока: слово в начало новой строки + пробел/Enter */
+const DOC_TRIGGERS = {
+    "зк": "vo", "з/к": "vo", "закадр": "vo", "закадровый": "vo",
+    "синх": "sync", "синхрон": "sync",
+    "стенд": "standup", "стендап": "standup",
+    "лайф": "life",
+    "шпи": "spiegel", "шпигель": "spiegel",
+    "подв": "vod", "подводка": "vod"
+};
+const PART_KINDS = new Set(["sync", "standup", "life", "spiegel"]);
+let currentBlockId = null;
+
+function autogrow(ta) {
+    ta.style.height = "auto";
+    ta.style.height = (ta.scrollHeight + 2) + "px";
+}
+function focusBlock(id, caret) {
+    const ta = document.querySelector('.doc-block[data-id="' + id + '"] .doc-text');
+    if (!ta) return;
+    ta.focus();
+    try { ta.setSelectionRange(caret || 0, caret || 0); } catch (e) {}
+}
+function setCurrentBlock(id) {
+    currentBlockId = id;
+    const b = state.blocks.find(x => x.id === id);
+    const lbl = $("curBlock");
+    if (!lbl) return;
+    if (!b) { lbl.textContent = ""; return; }
+    lbl.textContent = "→ " + blockTitle(b, typeNumbers()[b.id]);
+    const opt = [...$("targetBlock").options].find(o => +o.value === id && !o.disabled);
+    if (opt) $("targetBlock").value = String(id);      /* «В сценарий →» целит в текущий */
+}
+/* «зк », «синх » — рождение нового блока на ходу */
+function docTrigger(ta, b, i) {
+    const pos = ta.selectionStart;
+    if (pos !== ta.selectionEnd) return false;
+    const val = ta.value;
+    const lineStart = val.lastIndexOf("\n", pos - 1) + 1;
+    const word = val.slice(lineStart, pos).trim().toLowerCase();
+    const kind = DOC_TRIGGERS[word];
+    if (!kind) return false;
+    const rest = val.slice(pos);
+    histBefore();
+    if (lineStart === 0 && !rest.trim() && !b.parts.length) {
+        /* блок и так пуст (триггер — всё, что набрано) — переквалифицируем его */
+        b.kind = kind; b.text = "";
+        renderBlocks(); saveState(); refreshTargets();
+        focusBlock(b.id, 0);
+        return true;
+    }
+    b.text = val.slice(0, lineStart).replace(/\s+$/, "");
+    const nb = newBlock(kind);
+    nb.text = rest.trim();
+    state.blocks.splice(i + 1, 0, nb);
+    renderBlocks(); saveState(); refreshTargets();
+    focusBlock(nb.id, 0);
+    return true;
+}
+/* Backspace в начале пустой строки — склейка с предыдущим блоком */
+function docMergePrev(b, i) {
+    if (i <= 0) return false;
+    const prev = state.blocks[i - 1];
+    if (b.parts.length && !PART_KINDS.has(prev.kind)) {
+        toast("У блока есть фрагменты — сначала перенесите их в другой блок", "err");
+        return true;
+    }
+    histBefore();
+    const joinAt = (prev.text || "").length;
+    prev.text = (prev.text ? prev.text + "\n" : "") + b.text;
+    if (prev.kind === "sync" && !prev.speaker && b.speaker) { prev.speaker = b.speaker; prev.role = b.role; }
+    if (b.parts.length) prev.parts = prev.parts.concat(b.parts);
+    state.blocks.splice(i, 1);
+    renderBlocks(); saveState(); refreshTargets();
+    focusBlock(prev.id, joinAt);
+    return true;
+}
+function moveBlock(id, dir) {
+    const i = state.blocks.findIndex(x => x.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= state.blocks.length) return;
+    histBefore();
+    const [b] = state.blocks.splice(i, 1);
+    state.blocks.splice(j, 0, b);
+    const ta = document.activeElement;
+    const caret = ta && ta.selectionStart ? ta.selectionStart : 0;
+    renderBlocks(); saveState(); refreshTargets();
+    focusBlock(id, caret);
+}
+function pullPart(b) {
+    if (b.kind === "vo" || b.kind === "vod")
+        return toast("Этот блок — только текст", "err");
+    if (!curFile) return toast("Сначала откройте видео (клик в списке)", "err");
+    if (markIn === null || markOut === null)
+        return toast("Поставьте метки входа и выхода (I / O)", "err");
+    histBefore();
+    const vf = videoFiles.find(v => v.name === curFile && v.relPath === curRelPath) ||
+               videoFiles.find(v => v.name === curFile);
+    if (vf) dupWarning(vf);
+    b.parts.push({ file: curFile, in: markIn, out: markOut });
+    renderBlocks(); saveState();
+    toast("Фрагмент добавлен в «" + blockTitle(b, typeNumbers()[b.id]) + "»", "ok");
+    focusBlock(b.id, 99999);
+}
+
+/* ---------- Ctrl+Z / Ctrl+Y: снапшоты документа ---------- */
+const undoStack = [], redoStack = [];
+let typingBurst = 0;
+function serializeDoc() { return JSON.stringify({ b: state.blocks, n: state.nextId }); }
+/* вызывать ДО структурного изменения */
+function histBefore() {
+    undoStack.push(serializeDoc());
+    if (undoStack.length > 120) undoStack.shift();
+    redoStack.length = 0;
+    typingBurst = 0;
+}
+/* вызывать ПЕРЕД применением символа при печати: новый снимок — только начало серии (>600 мс) */
+function histTyping() {
+    const now = Date.now();
+    if (now - typingBurst > 600) {
+        undoStack.push(serializeDoc());
+        if (undoStack.length > 120) undoStack.shift();
+        redoStack.length = 0;
+    }
+    typingBurst = now;
+}
+function histRestore(s) {
+    const d = JSON.parse(s);
+    state.blocks = d.b; state.nextId = d.n;
+    renderBlocks(); saveState();
+}
+function doUndo() {
+    if (!undoStack.length) return toast("Отменять нечего", "warn");
+    redoStack.push(serializeDoc());
+    histRestore(undoStack.pop());
+    toast("Отменено (Ctrl+Y — вернуть)");
+}
+function doRedo() {
+    if (!redoStack.length) return;
+    undoStack.push(serializeDoc());
+    histRestore(redoStack.pop());
+}
+
 function renderBlocks() {
     const host = $("blocks");
     host.innerHTML = "";
     let total = 0;
     const nums = typeNumbers();
+    if (!state.blocks.length) {
+        host.innerHTML = '<div class="empty-hint">Документ пуст. Начните печатать с кнопок сверху, ' +
+            'или наберите в новой строке «зк», «синх», «стенд», «лайф», «шпи», «подв» + пробел.</div>';
+    }
 
     state.blocks.forEach((b, i) => {
         total += partsDur(b);
         const div = document.createElement("div");
-        div.className = "block " + b.kind + (b.folded ? " folded" : "");
+        div.className = "doc-block " + b.kind + (b.folded ? " folded" : "");
         div.dataset.id = b.id;
-        /* сохранённый пользователем размер блока (если менял) */
-        if (b.w) div.style.width = b.w;
-        if (b.h) div.style.height = b.h;
-        /* ручка resize: браузер сам тянет угол; после отпускания — фиксируем */
-        div.addEventListener("mouseup", () => captureBlockSize(b, div));
-        div.addEventListener("touchend", () => captureBlockSize(b, div));
 
         const dur = partsDur(b);
-        const summary = b.folded
-            ? `<span class="fold-sum">${esc((b.text || "").replace(/\s+/g, " ").trim().slice(0, 40)) || "без текста"}
-                ${b.parts.length ? "· " + b.parts.length + " фр." : ""}${dur ? "· " + durHuman(dur) : ""}</span>`
-            : `<span class="dur">${dur ? "(" + durHuman(dur) + ")" : ""}</span>`;
+        const label = b.kind === "sync" ? ("Синхрон " + nums[b.id]) : blockTitle(b, nums[b.id]);
+        const foldsum = b.folded
+            ? `<div class="doc-foldsum">${esc((b.text || "").replace(/\s+/g, " ").trim().slice(0, 60)) || "без текста"}
+               ${b.parts.length ? " · " + b.parts.length + " фр." : ""}${dur ? " · " + durHuman(dur) : ""}</div>` : "";
+        const ph = b.kind === "sync" ? "Расшифровка речи спикера…" :
+                   b.kind === "life" ? "Что в кадре, звук…" :
+                   b.kind === "spiegel" ? "Текст шпигеля…" :
+                   b.kind === "vod" ? "Текст подводки…" : "Текст…";
         div.innerHTML = `
-            <div class="block-head">
-                <span class="drag-h" draggable="true" title="Перетащите, чтобы изменить порядок">⠿</span>
-                <span class="num">${i + 1}.</span>
-                <span class="kind">${esc(blockTitle(b, nums[b.id]))}</span>
-                ${summary}
-                <span class="spacer"></span>
-                <button class="icon-btn fold-btn" data-act="fold" title="Свернуть / развернуть">${b.folded ? "▸" : "▾"}</button>
-                <button class="icon-btn" data-act="up"  title="Выше">↑</button>
-                <button class="icon-btn" data-act="down" title="Ниже">↓</button>
-                <button class="icon-btn" data-act="dup" title="Дублировать">⧉</button>
-                <button class="icon-btn" data-act="del" title="Удалить">✕</button>
+            <div class="doc-label"><span class="dot"></span><span class="lbl">${esc(label)}</span></div>
+            <span class="doc-fold" data-act="fold" title="Свернуть / развернуть${dur ? " · " + durHuman(dur) : ""}">${b.folded ? "▸" : "▾"}</span>
+            <div class="doc-tools">
+                <button data-act="dup" title="Дублировать">⧉</button>
+                <button data-act="del" title="Удалить">✕</button>
             </div>
-            <div class="block-body" ${b.folded ? "hidden" : ""}>
-            ${b.kind === "sync" ? `
-                <div class="row">
+            ${foldsum}
+            <div class="doc-body">
+                ${b.kind === "sync" ? `<div class="doc-sync-head">
                     <input class="b-speaker" placeholder="Спикер — ФИО" value="${esc(b.speaker)}">
-                    <input class="b-role" placeholder="должность" value="${esc(b.role)}" style="max-width:220px">
-                </div>` : ""}
-            <textarea class="b-text" placeholder="${b.kind === "sync" ? "Расшифровка текста спикера…" :
-                b.kind === "life" ? "Комментарий к лайфу (что в кадре, звук)…" :
-                b.kind === "spiegel" ? "Текст шпигеля…" :
-                b.kind === "vod" ? "Текст подводки…" : "Текст…"}">${esc(b.text)}</textarea>
-            ${b.kind === "vod" || b.kind === "vo" ? "" : `
-            <div class="parts"></div>
-            <div class="row"><button class="add-part">+ файл/фрагмент</button></div>`}
+                    <input class="b-role" placeholder="должность" value="${esc(b.role)}"></div>` : ""}
+                <textarea class="doc-text" rows="1" placeholder="${ph}">${esc(b.text)}</textarea>
+                ${PART_KINDS.has(b.kind) ? `
+                <div class="doc-parts"></div>
+                <button class="doc-pull" data-act="pull" title="Или Alt+Enter в тексте блока">🎞 Добавить фрагмент из плеера (I/O)</button>` : ""}
             </div>
         `;
-        const partsHost = div.querySelector(".parts");
-        b.parts.forEach((p, pi) => {
+
+        const partsHost = div.querySelector(".doc-parts");
+        if (partsHost) b.parts.forEach((p, pi) => {
             const pe = document.createElement("div");
-            pe.className = "part";
+            pe.className = "doc-part";
             pe.innerHTML = `
                 <span class="file" title="${esc(p.file)}">${esc(p.file)}</span>
                 <span class="tc">${tc(p.in)} → ${tc(p.out)}</span>
+                <span class="tc">${durHuman(p.out - p.in)}</span>
                 <button data-act="goto" title="Открыть в плеере">▶</button>
-                <button data-act="del-part">✕</button>
+                <button data-act="del-part" title="Убрать фрагмент">✕</button>
             `;
-            pe.querySelector("[data-act=del-part]").onclick = () => { b.parts.splice(pi, 1); renderBlocks(); saveState(); };
+            pe.querySelector("[data-act=del-part]").onclick = () => { histBefore(); b.parts.splice(pi, 1); renderBlocks(); saveState(); };
             pe.querySelector("[data-act=goto]").onclick = () => {
                 const vf = videoFiles.find(v => v.name === p.file);
                 if (!vf) return toast("Файл не в списке: " + p.file, "err");
@@ -859,77 +975,50 @@ function renderBlocks() {
                     toast("Имя «" + p.file + "» встречается в " + dups.length +
                           " папках — открыт первый: " + vf.relPath, "warn");
                 loadVideo(vf).then(() => {
-                    /* метки фрагмента уже выставлены loadedmetadata (края файла) —
-                       перезаписываем метками из блока */
                     markIn = p.in; markOut = p.out; marksSet = true; updateMarks();
                     $("player").currentTime = p.in;
-                    limitToMarks = true;              /* играть только In→Out */
+                    limitToMarks = true;
                     $("player").play().catch(() => {});
                 });
             };
             partsHost.appendChild(pe);
         });
-        const addPartBtn = div.querySelector(".add-part");
-        if (addPartBtn) addPartBtn.onclick = () => {
-            if (!curFile) return toast("Сначала разметьте фрагмент в плеере", "err");
-            if (markIn === null || markOut === null)
-                return toast("Поставьте метки входа и выхода (I / O)", "err");
-            const vf = videoFiles.find(v => v.name === curFile && v.relPath === curRelPath) ||
-                       videoFiles.find(v => v.name === curFile);
-            if (vf) dupWarning(vf);
-            b.parts.push({ file: curFile, in: markIn, out: markOut });
-            renderBlocks(); saveState();
-        };
-        div.querySelector(".b-text").addEventListener("input", e => { b.text = e.target.value; saveState(); });
+
+        const ta = div.querySelector(".doc-text");
+        autogrow(ta);
+        ta.addEventListener("input", () => { histTyping(); b.text = ta.value; autogrow(ta); saveState(); });
+        ta.addEventListener("focus", () => setCurrentBlock(b.id));
+        ta.addEventListener("keydown", e => {
+            if ((e.key === " " || e.key === "Enter") && docTrigger(ta, b, i)) { e.preventDefault(); return; }
+            if (e.key === "Backspace" && ta.selectionStart === 0 && ta.selectionEnd === 0 && docMergePrev(b, i)) { e.preventDefault(); return; }
+            if (e.altKey && e.key === "ArrowUp")   { e.preventDefault(); moveBlock(b.id, -1); return; }
+            if (e.altKey && e.key === "ArrowDown") { e.preventDefault(); moveBlock(b.id, +1); return; }
+            if (e.altKey && e.key === "Enter")     { e.preventDefault(); pullPart(b); return; }
+        });
         if (b.kind === "sync") {
-            div.querySelector(".b-speaker").addEventListener("input", e => { b.speaker = e.target.value; saveState(); refreshTargets(); });
-            div.querySelector(".b-role").addEventListener("input", e => { b.role = e.target.value; saveState(); });
+            div.querySelector(".b-speaker").addEventListener("input", e => { b.speaker = e.target.value; histTyping(); saveState(); refreshTargets(); });
+            div.querySelector(".b-role").addEventListener("input", e => { b.role = e.target.value; histTyping(); saveState(); });
         }
         div.addEventListener("click", e => {
             const act = e.target.closest("[data-act]")?.dataset.act;
-            if (!act) return;
-            if (act === "up" && i > 0) [state.blocks[i - 1], state.blocks[i]] = [b, state.blocks[i - 1]];
-            if (act === "down" && i < state.blocks.length - 1) [state.blocks[i + 1], state.blocks[i]] = [b, state.blocks[i + 1]];
-            if (act === "fold") b.folded = !b.folded;
-            if (act === "dup") state.blocks.splice(i + 1, 0, JSON.parse(JSON.stringify({ ...b, id: state.nextId++ })));
+            if (!act || act === "goto" || act === "del-part" || act === "pull") return;
+            if (act === "fold") { b.folded = !b.folded; }
+            if (act === "dup") { histBefore(); state.blocks.splice(i + 1, 0, JSON.parse(JSON.stringify({ ...b, id: state.nextId++ }))); }
             if (act === "del") {
                 if (!confirm("Удалить блок «" + blockTitle(b, nums[b.id]) + "» со всеми фрагментами?")) return;
+                histBefore();
                 state.blocks.splice(i, 1);
             }
-            if (act !== "del-part" && act !== "goto") { renderBlocks(); saveState(); refreshTargets(); }
+            renderBlocks(); saveState(); refreshTargets();
         });
-        /* перетаскивание блока за «⠿» — новый порядок */
-        const dh = div.querySelector(".drag-h");
-        dh.addEventListener("dragstart", e => {
-            dragId = b.id; dropBefore = false;
-            div.classList.add("drag-src"); document.body.classList.add("dragging");
-            e.dataTransfer.setData("text/plain", String(b.id));
-            e.dataTransfer.effectAllowed = "move";
-        });
-        dh.addEventListener("dragend", clearDrag);
-        div.addEventListener("dragover", e => {
-            if (dragId === null || dragId === b.id) return;
-            e.preventDefault();
-            const r = div.getBoundingClientRect();
-            dropBefore = e.clientY < r.top + r.height / 2;
-            div.classList.toggle("drop-above", dropBefore);
-            div.classList.toggle("drop-below", !dropBefore);
-        });
-        div.addEventListener("dragleave", () => div.classList.remove("drop-above", "drop-below"));
-        div.addEventListener("drop", e => {
-            if (dragId === null || dragId === b.id) return;
-            e.preventDefault();
-            const from = state.blocks.findIndex(x => x.id === dragId);
-            if (from < 0) return clearDrag();
-            const [blk] = state.blocks.splice(from, 1);
-            let to = state.blocks.findIndex(x => x.id === b.id);
-            if (!dropBefore) to++;
-            state.blocks.splice(Math.max(0, Math.min(state.blocks.length, to)), 0, blk);
-            clearDrag(); renderBlocks(); saveState();
-        });
+        div.querySelector('[data-act=pull]')?.addEventListener("click", () => pullPart(b));
         host.appendChild(div);
     });
 
+    if (currentBlockId) {
+        const cur = state.blocks.find(x => x.id === currentBlockId);
+        if (!cur) setCurrentBlock(null); else setCurrentBlock(cur.id);
+    }
     $("totalDur").textContent = state.blocks.length
         ? "Общий хронометраж: " + (total > 0 ? durHuman(total) : "0 с") : "";
     refreshTargets();
@@ -986,10 +1075,15 @@ $("btnSend").addEventListener("click", () => {
 
 /* ---------- горячие клавиши плеера ---------- */
 document.addEventListener("keydown", e => {
+    const mod = e.ctrlKey || e.metaKey;
     if (e.key === "Escape") {
+        if (!$("findBar").hidden) { closeSearch(); return; }
         if (!$("wordModal").hidden) { closeWordReview(); return; }
         if (!$("namesModal").hidden) { closeNmModal(); return; }
     }
+    if (mod && !e.altKey && /^(z|я)$/i.test(e.key)) { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return; }
+    if (mod && !e.altKey && /^(y|н)$/i.test(e.key)) { e.preventDefault(); doRedo(); return; }
+    if (mod && /^(f|а)$/i.test(e.key)) { e.preventDefault(); openSearch(); return; }
     const inField = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "");
     if (inField) return;
     const p = $("player");
@@ -1004,6 +1098,66 @@ document.addEventListener("keydown", e => {
     else if (e.key === " ") { e.preventDefault(); p.paused ? p.play() : p.pause(); }
     else if (e.key === "p" || e.key === "P" || e.key === "з" || e.key === "З") { e.preventDefault(); togglePreview(); }
 });
+
+/* ---------- поиск по сюжету (Ctrl+F) ---------- */
+let findHits = [], findPos = -1;
+function openSearch() {
+    $("findBar").hidden = false;
+    $("findInput").focus();
+    $("findInput").select();
+    doFind();
+}
+function closeSearch() {
+    $("findBar").hidden = true;
+    findHits = []; findPos = -1;
+    $("findCount").textContent = "";
+}
+function collectFind(q) {
+    findHits = []; findPos = -1;
+    if (!q) { $("findCount").textContent = ""; return; }
+    const needle = q.toLowerCase();
+    state.blocks.forEach(b => {
+        const hay = (b.kind === "sync" ? (b.speaker + " " + b.role + "\n") : "") + b.text;
+        let i = hay.toLowerCase().indexOf(needle);
+        while (i !== -1) {
+            findHits.push({ id: b.id, start: i });
+            if (findHits.length > 500) return;
+            i = hay.toLowerCase().indexOf(needle, i + needle.length);
+        }
+    });
+    $("findCount").textContent = findHits.length ? "" : "ничего не найдено";
+}
+function gotoFind(delta) {
+    if (!findHits.length) return;
+    findPos = (findPos + delta + findHits.length) % findHits.length;
+    const h = findHits[findPos];
+    const el = document.querySelector('.doc-block[data-id="' + h.id + '"]');
+    if (!el) return;
+    const b = state.blocks.find(x => x.id === h.id);
+    if (b.folded) { b.folded = false; renderBlocks(); }
+    const ta = document.querySelector('.doc-block[data-id="' + h.id + '"] .doc-text');
+    $("findCount").textContent = (findPos + 1) + " / " + findHits.length;
+    if (ta) {
+        const inText = Math.max(0, h.start - ((b.kind === "sync") ? (b.speaker + " " + b.role + "\n").length : 0));
+        ta.scrollIntoView({ block: "center", behavior: "smooth" });
+        ta.focus();
+        try { ta.setSelectionRange(inText, inText + ($("findInput").value || "").length); } catch (e) {}
+    } else {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+}
+function doFind() {
+    collectFind(($("findInput").value || "").trim());
+    if (findHits.length) gotoFind(1);
+}
+$("findInput").addEventListener("input", doFind);
+$("findInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); gotoFind(e.shiftKey ? -1 : 1); }
+});
+$("findNext").onclick = () => gotoFind(1);
+$("findPrev").onclick = () => gotoFind(-1);
+$("findClose").onclick = closeSearch;
+$("btnFind").onclick = () => $("findBar").hidden ? openSearch() : closeSearch();
 
 /* ---------- экспорт: CSV для Fish Cutter (разделитель на выбор, экранирование) ---------- */
 function buildCsv() {
@@ -1448,7 +1602,6 @@ $("csvSep").addEventListener("change", () => store.set("ss_sep", $("csvSep").val
    (refreshNameSelects сохранит восстановленный выбор) */
 loadSharedNames(refreshNameSelects);
 setView(viewMode);          /* применить сохранённый вид списка и подсветку кнопок */
-setCols(blockCols);         /* сохранённый вид списка блоков (1/2 колонки) */
 if (!loadDraftData({ blocks: store.get("ss_blocks", []), nextId: store.get("ss_nextId", 1) }))
     renderBlocks();
 const savedDir = store.get("ss_dirname", "");
