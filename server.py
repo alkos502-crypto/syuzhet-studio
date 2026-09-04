@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """Сюжет-Студия: раздача статики + запись общего списка имён (POST /names.json).
 
-Запуск: python3 server.py [порт]   (по умолчанию 8765)
+Запуск: python3 server.py [порт] [--open]
+  --open — открыть страницу в браузере автоматически (для Windows-версии)
 """
 import json
 import os
 import shutil
+import socket
 import sys
 import tempfile
+import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8765
+args = [a for a in sys.argv[1:] if a != "--open"]
+OPEN_BROWSER = "--open" in sys.argv[1:]
+PORT = int(args[0]) if args else 8765
 ROOT = os.path.dirname(os.path.abspath(__file__))
 NAMES_FILE = os.path.join(ROOT, "names.json")
 ROLES = ("fioReporter", "fioCam", "fioEditor")
@@ -79,11 +84,38 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
 
+def lan_ip():
+    """Сетевой адрес для коллег (UDP-connect не отправляет трафик)."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
 if __name__ == "__main__":
+    try:
+        sys.stdout.reconfigure(errors="replace")   # консоль Windows может не любить кириллицу
+    except Exception:
+        pass
     os.chdir(ROOT)
     handler = lambda *a, **kw: Handler(*a, directory=ROOT, **kw)  # noqa: E731
-    httpd = ThreadingHTTPServer(("", PORT), handler)
-    print("Сюжет-Студия: http://localhost:%d  (names.json: запись через POST)" % PORT)
+    try:
+        httpd = ThreadingHTTPServer(("", PORT), handler)
+    except OSError as e:
+        print("Не удалось запустить сервер на порту %d: %s" % (PORT, e), flush=True)
+        print("Скорее всего порт занят — закройте другое окно Сюжет-Студии или поменяйте порт.")
+        sys.exit(1)
+    print("Сюжет-Студия запущена (Ctrl+C или закрытие окна — остановка)", flush=True)
+    print("  На этом компьютере:  http://localhost:%d" % PORT, flush=True)
+    ip = lan_ip()
+    if ip:
+        print("  В сети для коллег:    http://%s:%d" % (ip, PORT), flush=True)
+    if OPEN_BROWSER:
+        webbrowser.open("http://localhost:%d" % PORT)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
