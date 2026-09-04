@@ -34,6 +34,8 @@
             <div><label>Название сюжета</label><input id="storyTitle" placeholder="ОЭМК: кислородная станция"></div>
             <div><label>FPS таймкодов</label><input id="fpsInput" type="number" min="1" max="240" step="any" value="25"
                  title="Частота кадров проекта. 25 / 29.97 / 50… — должна совпадать с секвенцией в Premiere"></div>
+            <div><label>Темп чтеца, зн/мин</label><input id="readSpeed" type="number" min="60" max="2400" step="10" value="540"
+                 title="Для оценки хронометража текстовых блоков (VO, LEAD, HEADLINE) без фрагментов. 540 ≈ телеграфный темп"></div>
             <div>
                 <label>Корреспондент</label>
                 <div class="nf-row">
@@ -107,7 +109,7 @@
                     <li>← → — шаг на кадр; Shift+← → — на секунду</li>
                     <li>Пробел — пауза; P — циклический предпросмотр In→Out</li>
                     <li>В тексте блока: Alt+↑/↓ — переместить; Alt+Enter — вставить фрагмент из плеера</li>
-                    <li>Новая строка: «зк», «синх», «стенд», «лайф», «шпи», «подв» + пробел — новый блок</li>
+                    <li>Новая строка: «хед», «лид», «зк», «синх», «стенд», «лайф», «шпи» + пробел — новый блок; клик по бейджу — сменить тип</li>
                     <li>Ctrl+F — поиск; Ctrl+Z / Ctrl+Shift+Z — отменить/вернуть; Esc — закрыть поиск</li>
                 </ul>
             </details>
@@ -118,12 +120,13 @@
                 <select id="targetBlock"></select>
                 <label>как</label>
                 <select id="sendMode" title="Тип нового блока, если выбран «+ новый»">
+                    <option value="headline">Заголовок</option>
+                    <option value="vod">Подводка (LEAD)</option>
                     <option value="vo">Закадровый</option>
-                    <option value="standup">Стендап</option>
                     <option value="sync">Часть синхрона</option>
+                    <option value="standup">Стендап</option>
                     <option value="life">Лайф</option>
                     <option value="spiegel">Шпигель</option>
-                    <option value="vod">Подводка</option>
                 </select>
                 <button id="btnSend" class="accent">В сценарий →</button>
             </div>
@@ -150,12 +153,13 @@
     <!-- ================== СЦЕНАРИЙ ================== -->
     <section id="left">
         <div class="row">
-            <button id="btnAddSpiegel" class="btn-spiegel">+ Шпигель</button>
-            <button id="btnAddVod" class="btn-vod">+ Подводка</button>
-            <button id="btnAddStandup" class="btn-standup">+ Стендап</button>
-            <button id="btnAddVO" class="btn-vo">+ Закадровый</button>
-            <button id="btnAddSync" class="btn-sync">+ Синхрон</button>
-            <button id="btnAddLife" class="btn-life">+ Лайф</button>
+            <button id="btnAddHeadline" class="btn-headline">+ HEADLINE</button>
+            <button id="btnAddVod" class="btn-vod">+ LEAD</button>
+            <button id="btnAddVO" class="btn-vo">+ VO</button>
+            <button id="btnAddSync" class="btn-sync">+ SOT</button>
+            <button id="btnAddStandup" class="btn-standup">+ STANDUP</button>
+            <button id="btnAddLife" class="btn-life">+ LIFE</button>
+            <button id="btnAddSpiegel" class="btn-spiegel">+ SPIEGEL</button>
             <span class="spacer"></span>
             <button id="btnFind" title="Поиск по тексту сюжета (Ctrl+F)">🔍 Поиск</button>
             <button id="btnFoldAll" title="Свернуть / развернуть все блоки">⤡ все</button>

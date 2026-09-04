@@ -58,7 +58,7 @@ function esc(s) {
 }
 
 /* ---------- сохранение реквизитов ---------- */
-const REQ_IDS = ["storyTitle","fpsInput","fioReporter","fioCam","fioEditor"];
+const REQ_IDS = ["storyTitle","fpsInput","readSpeed","fioReporter","fioCam","fioEditor"];
 const NAME_IDS = ["fioReporter","fioCam","fioEditor"];
 /* фактическое значение select'а ФИО: пункт «+» заменяем сохранённым именем */
 function resolveNameValue(id) {
@@ -709,6 +709,16 @@ function updateMarks() {
 }
 
 /* ---------- блоки сценария ---------- */
+/* обложки-бейджи: внутренние ключи не меняем — только отображение */
+const KIND_META = {
+    headline: { badge: "HEADLINE", ru: "Заголовок" },
+    vod:      { badge: "LEAD",     ru: "Подводка"  },
+    vo:       { badge: "VO",       ru: "ЗК"        },
+    sync:     { badge: "SOT",      ru: "Синхрон"   },
+    standup:  { badge: "STANDUP",  ru: "Стендап"   },
+    life:     { badge: "LIFE",     ru: "Лайф"      },
+    spiegel:  { badge: "SPIEGEL",  ru: "Шпигель"   }
+};
 function newBlock(kind) {
     return {
         id: state.nextId++,
@@ -737,28 +747,48 @@ $("btnAddVO").onclick = () => addAndFocus("vo");
 $("btnAddStandup").onclick = () => addAndFocus("standup");
 $("btnAddSync").onclick = () => addAndFocus("sync");
 $("btnAddLife").onclick = () => addAndFocus("life");
+$("btnAddHeadline").onclick = () => addAndFocus("headline");
 $("btnAddSpiegel").onclick = () => addAndFocus("spiegel");
 $("btnAddVod").onclick = () => addAndFocus("vod");
 
-/* заголовок блока. n — номер ПО ТИПУ (1-й закадр = «ЗК 1»,
-   2-й синхрон = «Синхрон 2»), не позиция в сценарии.
-   Шпигель и подводка в сюжете одни — без номера */
+/* заголовок блока для тостов/подтверждений/экспорта (внутренние русские имена) */
 function blockTitle(b, n) {
     if (b.kind === "vo") return `ЗК ${n}`;
     if (b.kind === "standup") return `Стендап ${n}`;
     if (b.kind === "life") return `Лайф ${n}`;
     if (b.kind === "spiegel") return "Шпигель";
     if (b.kind === "vod") return "Подводка";
+    if (b.kind === "headline") return `Заголовок ${n}`;
     return `Синхрон ${n}` + (b.speaker ? ` — ${b.speaker}` : "");
 }
 /* типовые номера всех блоков: {id: 1-based номер внутри своего типа} */
 function typeNumbers() {
-    const c = { vo: 0, standup: 0, sync: 0, life: 0, spiegel: 0, vod: 0 }, out = {};
+    const c = { headline: 0, vo: 0, standup: 0, sync: 0, life: 0, spiegel: 0, vod: 0 }, out = {};
     state.blocks.forEach(b => { c[b.kind]++; out[b.id] = c[b.kind]; });
     return out;
 }
 function partsDur(b) {
     return b.parts.reduce((s, p) => s + ((p.out ?? 0) - (p.in ?? 0)), 0);
+}
+/* ---------- длительности блока ---------- */
+/* скорость чтения диктора, зн/сек (поле в шапке, по умолчанию 540 зн/мин = 9 зн/с) */
+function readCps() {
+    const v = parseFloat($("readSpeed").value);
+    return (v > 60 && v <= 2400) ? v / 60 : 9;
+}
+function estDur(b) {
+    const s = (b.text || "").replace(/\s+/g, " ").trim();
+    return s ? Math.round(s.length / readCps()) : 0;
+}
+/* факт по фрагментам, иначе оценка по тексту (для него в UI приставка «~») */
+function blockDur(b) {
+    if (PART_KINDS.has(b.kind) && b.parts.length) return partsDur(b);
+    return estDur(b);
+}
+function durTc(sec) {
+    if (!sec) return "";
+    const s = Math.round(sec);
+    return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 /* предупреждение о дублях: имя файла встречается в нескольких подпапках */
 function dupWarning(file) {
@@ -769,16 +799,46 @@ function dupWarning(file) {
 }
 
 /* ---------- «печатная машинка»: набор текста как в Word ---------- */
+const PART_KINDS = new Set(["sync", "standup", "life", "spiegel"]);
 /* триггеры нового блока: слово в начало новой строки + пробел/Enter */
 const DOC_TRIGGERS = {
-    "зк": "vo", "з/к": "vo", "закадр": "vo", "закадровый": "vo",
-    "синх": "sync", "синхрон": "sync",
-    "стенд": "standup", "стендап": "standup",
-    "лайф": "life",
-    "шпи": "spiegel", "шпигель": "spiegel",
-    "подв": "vod", "подводка": "vod"
+    "зк": "vo", "з/к": "vo", "закадр": "vo", "закадровый": "vo", "vo": "vo",
+    "синх": "sync", "синхрон": "sync", "sot": "sync",
+    "стенд": "standup", "стендап": "standup", "standup": "standup",
+    "лайф": "life", "life": "life",
+    "шпи": "spiegel", "шпигель": "spiegel", "spiegel": "spiegel",
+    "подв": "vod", "подводка": "vod", "лид": "vod", "lead": "vod",
+    "хед": "headline", "хедлайн": "headline", "заголовок": "headline", "headline": "headline",
 };
-const PART_KINDS = new Set(["sync", "standup", "life", "spiegel"]);
+/* смена типа по клику на бейдж */
+function closeKindMenu() { const m = $("kindMenu"); if (m) m.remove(); }
+function changeBlockKind(b, kind) {
+    closeKindMenu();
+    if (kind === b.kind) return;
+    if (b.parts.length && !PART_KINDS.has(kind) &&
+        !confirm("В блоке есть фрагменты — при смене типа они будут удалены. Продолжить?")) return;
+    histBefore();
+    b.kind = kind;
+    if (!PART_KINDS.has(kind)) b.parts = [];
+    renderBlocks(); saveState(); refreshTargets();
+}
+function showKindMenu(b, anchor) {
+    closeKindMenu();
+    const menu = document.createElement("div");
+    menu.id = "kindMenu"; menu.className = "kind-menu";
+    Object.entries(KIND_META).forEach(([k, m]) => {
+        const it = document.createElement("button");
+        it.className = "kind-item " + k + (k === b.kind ? " sel" : "");
+        it.textContent = m.badge;
+        it.onmousedown = e => { e.stopPropagation(); changeBlockKind(b, k); };
+        menu.appendChild(it);
+    });
+    document.body.appendChild(menu);
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = Math.min(r.left, window.innerWidth - 140) + "px";
+    menu.style.top = (r.bottom + 4) + "px";
+    setTimeout(() => document.addEventListener("mousedown", closeKindMenu, { once: true }), 0);
+}
 let currentBlockId = null;
 
 function autogrow(ta) {
@@ -858,7 +918,7 @@ function moveBlock(id, dir) {
     focusBlock(id, caret);
 }
 function pullPart(b) {
-    if (b.kind === "vo" || b.kind === "vod")
+    if (!PART_KINDS.has(b.kind))
         return toast("Этот блок — только текст", "err");
     if (!curFile) return toast("Сначала откройте видео (клик в списке)", "err");
     if (markIn === null || markOut === null)
@@ -918,40 +978,44 @@ function renderBlocks() {
     const nums = typeNumbers();
     if (!state.blocks.length) {
         host.innerHTML = '<div class="empty-hint">Документ пуст. Начните печатать с кнопок сверху, ' +
-            'или наберите в новой строке «зк», «синх», «стенд», «лайф», «шпи», «подв» + пробел.</div>';
+            'или наберите в новой строке «хед», «лид», «зк», «синх», «стенд», «лайф», «шпи» + пробел.</div>';
     }
 
     state.blocks.forEach((b, i) => {
-        total += partsDur(b);
+        const dur = blockDur(b);
+        total += dur;
+        const est = !(PART_KINDS.has(b.kind) && b.parts.length) && dur > 0;
         const div = document.createElement("div");
         div.className = "doc-block " + b.kind + (b.folded ? " folded" : "");
         div.dataset.id = b.id;
 
-        const dur = partsDur(b);
-        const label = b.kind === "sync" ? ("Синхрон " + nums[b.id]) : blockTitle(b, nums[b.id]);
-        const foldsum = b.folded
-            ? `<div class="doc-foldsum">${esc((b.text || "").replace(/\s+/g, " ").trim().slice(0, 60)) || "без текста"}
-               ${b.parts.length ? " · " + b.parts.length + " фр." : ""}${dur ? " · " + durHuman(dur) : ""}</div>` : "";
-        const ph = b.kind === "sync" ? "Расшифровка речи спикера…" :
+        const ph = b.kind === "headline" ? "Текст заголовки на экране…" :
+                   b.kind === "sync" ? "Реплика спикера в кавычках…" :
                    b.kind === "life" ? "Что в кадре, звук…" :
                    b.kind === "spiegel" ? "Текст шпигеля…" :
-                   b.kind === "vod" ? "Текст подводки…" : "Текст…";
+                   b.kind === "vod" ? "Текст подводки (отвода)…" : "Текст…";
+        const foldsum = b.folded
+            ? `<div class="fold-sum">${esc((b.text || "").replace(/\s+/g, " ").trim().slice(0, 90)) ||
+               (b.speaker ? esc(b.speaker) : "без текста")}<span class="muted">
+               ${b.parts.length ? " · " + b.parts.length + " фр." : ""}</span></div>` : "";
         div.innerHTML = `
-            <div class="doc-label"><span class="dot"></span><span class="lbl">${esc(label)}</span></div>
-            <span class="doc-fold" data-act="fold" title="Свернуть / развернуть${dur ? " · " + durHuman(dur) : ""}">${b.folded ? "▸" : "▾"}</span>
-            <div class="doc-tools">
-                <button data-act="dup" title="Дублировать">⧉</button>
-                <button data-act="del" title="Удалить">✕</button>
-            </div>
-            ${foldsum}
-            <div class="doc-body">
-                ${b.kind === "sync" ? `<div class="doc-sync-head">
-                    <input class="b-speaker" placeholder="Спикер — ФИО" value="${esc(b.speaker)}">
+            <button class="badge ${b.kind}" data-act="badge" title="Сменить тип блока">${esc(KIND_META[b.kind].badge)}</button>
+            <div class="doc-main">
+                ${b.kind === "sync" ? `<div class="doc-speaker">
+                    <input class="b-speaker" placeholder="СПИКЕР — ФИО" value="${esc(b.speaker)}">
+                    <span class="sot-suf">(СИНХРОН)</span>
                     <input class="b-role" placeholder="должность" value="${esc(b.role)}"></div>` : ""}
+                ${foldsum}
                 <textarea class="doc-text" rows="1" placeholder="${ph}">${esc(b.text)}</textarea>
                 ${PART_KINDS.has(b.kind) ? `
                 <div class="doc-parts"></div>
                 <button class="doc-pull" data-act="pull" title="Или Alt+Enter в тексте блока">🎞 Добавить фрагмент из плеера (I/O)</button>` : ""}
+            </div>
+            <span class="doc-dur" title="${est ? "Оценка по длине текста (~9 зн/с, настраивается в шапке)" : "Сумма таймкодов фрагментов"}">${est ? "~" : ""}${durTc(dur)}</span>
+            <div class="doc-tools">
+                <button data-act="fold" title="Свернуть / развернуть">${b.folded ? "▸" : "▾"}</button>
+                <button data-act="dup" title="Дублировать">⧉</button>
+                <button data-act="del" title="Удалить">✕</button>
             </div>
         `;
 
@@ -986,7 +1050,7 @@ function renderBlocks() {
 
         const ta = div.querySelector(".doc-text");
         autogrow(ta);
-        ta.addEventListener("input", () => { histTyping(); b.text = ta.value; autogrow(ta); saveState(); });
+        ta.addEventListener("input", () => { histTyping(); b.text = ta.value; autogrow(ta); saveState(); refreshDur(i); });
         ta.addEventListener("focus", () => setCurrentBlock(b.id));
         ta.addEventListener("keydown", e => {
             if ((e.key === " " || e.key === "Enter") && docTrigger(ta, b, i)) { e.preventDefault(); return; }
@@ -996,13 +1060,15 @@ function renderBlocks() {
             if (e.altKey && e.key === "Enter")     { e.preventDefault(); pullPart(b); return; }
         });
         if (b.kind === "sync") {
-            div.querySelector(".b-speaker").addEventListener("input", e => { b.speaker = e.target.value; histTyping(); saveState(); refreshTargets(); });
-            div.querySelector(".b-role").addEventListener("input", e => { b.role = e.target.value; histTyping(); saveState(); });
+            div.querySelector(".b-speaker").addEventListener("input", e => { histTyping(); b.speaker = e.target.value; saveState(); refreshTargets(); });
+            div.querySelector(".b-role").addEventListener("input", e => { histTyping(); b.role = e.target.value; saveState(); });
         }
         div.addEventListener("click", e => {
             const act = e.target.closest("[data-act]")?.dataset.act;
-            if (!act || act === "goto" || act === "del-part" || act === "pull") return;
-            if (act === "fold") { b.folded = !b.folded; }
+            if (!act) return;
+            if (act === "badge") { showKindMenu(b, e.target.closest(".badge")); return; }
+            if (act === "goto" || act === "del-part" || act === "pull") return;
+            if (act === "fold") b.folded = !b.folded;
             if (act === "dup") { histBefore(); state.blocks.splice(i + 1, 0, JSON.parse(JSON.stringify({ ...b, id: state.nextId++ }))); }
             if (act === "del") {
                 if (!confirm("Удалить блок «" + blockTitle(b, nums[b.id]) + "» со всеми фрагментами?")) return;
@@ -1020,8 +1086,18 @@ function renderBlocks() {
         if (!cur) setCurrentBlock(null); else setCurrentBlock(cur.id);
     }
     $("totalDur").textContent = state.blocks.length
-        ? "Общий хронометраж: " + (total > 0 ? durHuman(total) : "0 с") : "";
+        ? "Хронометраж: " + (total > 0 ? durTc(total) + " (оценки с ~)" : "00:00") : "";
     refreshTargets();
+}
+/* обновить только колонку длительности (без полного ререндера при печати) */
+function refreshDur(i) {
+    const el = $("blocks").children[i];
+    if (!el || !el.querySelector) return;
+    const b = state.blocks[i];
+    const dur = blockDur(b);
+    const est = !(PART_KINDS.has(b.kind) && b.parts.length) && dur > 0;
+    const cell = el.querySelector(".doc-dur");
+    if (cell) cell.textContent = (est ? "~" : "") + durTc(dur);
 }
 
 /* цель для «В сценарий →»: существующие блоки + пункт «новый блок типа «как»» */
@@ -1034,7 +1110,7 @@ function refreshTargets() {
     let html = `<option value="${NEW_TARGET}">+ новый: ${esc(modeTxt)}</option>`;
     html += state.blocks.map(b => {
         const t = blockTitle(b, nums[b.id]);
-        const can = b.kind !== "vod" && b.kind !== "vo";
+        const can = PART_KINDS.has(b.kind);
         return `<option value="${b.id}" ${can ? "" : "disabled"}>${esc(t)}</option>`;
     }).join("");
     sel.innerHTML = html;
@@ -1050,7 +1126,7 @@ $("btnSend").addEventListener("click", () => {
     if ($("targetBlock").value === NEW_TARGET) {
         const kind = $("sendMode").value;
         const b = newBlock(kind);
-        if (kind === "vod" || kind === "vo") {
+        if (!PART_KINDS.has(kind)) {
             state.blocks.push(b); renderBlocks(); saveState();
             return toast("Блок «" + blockTitle(b, typeNumbers()[b.id]) + "» создан — это только текст, фрагмент не добавлен", "warn");
         }
@@ -1064,8 +1140,7 @@ $("btnSend").addEventListener("click", () => {
     const id = parseInt($("targetBlock").value, 10);
     const b = state.blocks.find(x => x.id === id);
     if (!b) return toast("Выберите блок", "err");
-    if (b.kind === "vod") return toast("У подводки нет видеофрагментов", "err");
-    if (b.kind === "vo") return toast("Блок ЗК — только текст. Фрагменты — в синхрон, стендап, лайф или шпигель", "err");
+    if (!PART_KINDS.has(b.kind)) return toast("Этот блок — только текст. Фрагменты — в SOT, стендап, лайф или шпигель", "err");
     if (vf) dupWarning(vf);
     b.parts.push({ file: curFile, in: markIn, out: markOut });
     const nums = typeNumbers();
@@ -1175,9 +1250,14 @@ function buildCsv() {
     L.push("# Таймкод: NDF " + fpsVal() + " к/с; Дата: " + new Date().toISOString().slice(0, 10));
     L.push("#");
     L.push(row("файл", "вход", "выход", "подпись"));
-    let voN = 0, suN = 0, syN = 0, liN = 0;
+    let voN = 0, suN = 0, syN = 0, liN = 0, hdN = 0;
     state.blocks.forEach(b => {
-        if (b.kind === "vo") {
+        if (b.kind === "headline") {
+            hdN++;
+            L.push("#");
+            L.push("# ——— ЗАГОЛОВОК " + hdN + " ———");
+            b.text.split(/\r?\n/).forEach(t => L.push("# " + t));
+        } else if (b.kind === "vo") {
             voN++;
             L.push("#");
             L.push("# ——— ЗАКАДР " + voN + " ———");
@@ -1230,9 +1310,10 @@ function buildDoc() {
         <b>Оператор:</b> ${h(resolveNameValue("fioCam")) || "—"}<br>
         <b>Монтажёр:</b> ${h(resolveNameValue("fioEditor")) || "—"}<br>
         <b>Дата:</b> ${h(new Date().toISOString().slice(0, 10))}</p><hr>`;
-    let voN = 0, suN = 0, syN = 0, liN = 0;
+    let voN = 0, suN = 0, syN = 0, liN = 0, hdN = 0;
     state.blocks.forEach(b => {
-        if (b.kind === "vo") { voN++; body += `<h3>Закадровый текст ${voN}</h3><p>${h(b.text)}</p>`; }
+        if (b.kind === "headline") { hdN++; body += `<h3>Заголовок ${hdN}</h3><p>${h(b.text)}</p>`; }
+        else if (b.kind === "vo") { voN++; body += `<h3>Закадровый текст ${voN}</h3><p>${h(b.text)}</p>`; }
         else if (b.kind === "standup") { suN++; body += `<h3>Стендап ${suN}</h3><p>${h(b.text)}</p>`; }
         else if (b.kind === "life") { liN++; body += `<h3>Лайф ${liN}</h3>${b.text ? `<p>${h(b.text)}</p>` : ""}`; }
         else if (b.kind === "spiegel") { body += `<h3>Шпигель</h3>${b.text ? `<p>${h(b.text)}</p>` : ""}`; }
@@ -1274,7 +1355,7 @@ $("btnExportDoc").onclick = () => {
 };
 
 /* ---------- черновик JSON + автосохранение ---------- */
-const KINDS = new Set(["vo", "standup", "sync", "life", "spiegel", "vod"]);
+const KINDS = new Set(["headline", "vo", "standup", "sync", "life", "spiegel", "vod"]);
 /* приведение блоков из localStorage/черновика к безопасному виду */
 function normalizeBlocks(arr) {
     return (Array.isArray(arr) ? arr : []).filter(b => b && typeof b === "object" && KINDS.has(b.kind))
@@ -1338,15 +1419,17 @@ $("wordFile").onchange = e => {
 /* заголовки блоков, как их печатает buildDoc (нумерация — по типу) */
 function parseWordHead(h) {
     let m;
-    if (/^закадр/i.test(h) || /^зк[\s.]/i.test(h)) {
+    if ((m = h.match(/^заголовок\s*(\d+)/i)) || (m = h.match(/^headline\s*(\d+)/i)))
+        return { kind: "headline", num: +m[1] };
+    if (/^закадр/i.test(h) || /^зк[\s.]/i.test(h) || /^vo\b/i.test(h)) {
         const d = h.match(/\d+/);
         return { kind: "vo", num: d ? +d[0] : NaN };
     }
-    if ((m = h.match(/^стендап\s*(\d+)/i))) return { kind: "standup", num: +m[1] };
-    if ((m = h.match(/^лайф\s*(\d+)/i))) return { kind: "life", num: +m[1] };
-    if (/^шпигель/i.test(h)) return { kind: "spiegel" };
-    if (/^подводка/i.test(h)) return { kind: "vod" };
-    if ((m = h.match(/^синхрон\s*(\d+)\s*[.．]?\s*(.*)$/i))) {
+    if ((m = h.match(/^стендап\s*(\d+)/i)) || (m = h.match(/^standup\s*(\d+)/i))) return { kind: "standup", num: +m[1] };
+    if ((m = h.match(/^лайф\s*(\d+)/i)) || (m = h.match(/^life\s*(\d+)/i))) return { kind: "life", num: +m[1] };
+    if (/^шпигель/i.test(h) || /^spiegel/i.test(h)) return { kind: "spiegel" };
+    if (/^подвод/i.test(h) || /^lead\b/i.test(h)) return { kind: "vod" };
+    if ((m = h.match(/^синхрон\s*(\d+)\s*[.．]?\s*(.*)$/i)) || (m = h.match(/^sot\s*(\d+)\s*[.．]?\s*(.*)$/i))) {
         const parts = (m[2] || "").split(/[,;]/);
         return { kind: "sync", num: +m[1],
                  speaker: (parts.shift() || "").replace(/^—+\s*/, "").trim(),

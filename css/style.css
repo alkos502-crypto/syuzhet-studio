@@ -73,91 +73,124 @@ main {
 body.dragging { user-select: none; }
 body.dragging.col { cursor: col-resize; }
 
-/* =================== ДОКУМЕНТ (режим «печатная машинка») ===================
-   Сценарий — белая «бумага» по центру; блоки — строки текста без карточек.
-   Метка типа — на полях слева (как стили абзацев в Word), текст — авторастущий. */
+/* =================== ЛЕНТА СЦЕНАРИЯ (режим «-Octopus-лайт») ===================
+   Строка блока: [TYPE badge]  ТЕКСТ  [DURATION]. Тип меняется кликом по бейджу. */
 main { padding: 0 16px 40px; }
-#left { max-width: 860px; margin: 0 auto; }
+#left { max-width: 900px; margin: 0 auto; }
 #blocks {
     display: block;
     background: #f7f5ef; color: #1e1e1e;
     border: 1px solid #cfc9bc; border-radius: 3px;
     box-shadow: 0 6px 26px rgba(0,0,0,.35);
-    padding: 34px 46px 46px; min-height: 60vh;
+    padding: 26px 30px 40px; min-height: 60vh;
     font-family: Georgia, "Times New Roman", "PT Serif", serif;
 }
-#blocks .empty-hint { color: #9a9384; font-size: 14px; font-style: italic; }
-.doc-block { position: relative; margin: 0 0 16px; padding-left: 118px; }
-.doc-label {
-    position: absolute; left: 0; top: 1px; width: 108px;
-    display: flex; align-items: baseline; gap: 4px;
-    font-family: -apple-system, "Segoe UI", sans-serif;
-    font-size: 11px; font-weight: 700; letter-spacing: .02em; color: #6b7280;
+#blocks .empty-hint { color: #9a9384; font-size: 14px; font-style: italic; padding: 8px 0 0 106px; }
+.doc-block {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 5px 6px; margin: 0 -6px; border-radius: 6px;
 }
-.doc-label .dot { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto; align-self: center; }
-.doc-label .lbl { text-transform: uppercase; }
-.doc-label .dur { color: #9aa0a6; font-weight: 400; margin-left: auto; }
-.doc-tools {
-    position: absolute; right: 0; top: 0; display: flex; gap: 2px;
-    opacity: 0; transition: opacity .12s;
+.doc-block:focus-within { background: #efeadd; }
+.badge {
+    flex: 0 0 82px; margin-top: 2px; border: none; border-radius: 4px; cursor: pointer;
+    padding: 3px 2px; color: #fff; text-transform: uppercase;
+    font: 700 10.5px/1.25 -apple-system, "Segoe UI", sans-serif; letter-spacing: .05em;
+    opacity: .92;
 }
+.badge:hover { opacity: 1; filter: brightness(1.07); }
+.doc-block.headline .badge { background: #2f6ba0; }
+.doc-block.vod     .badge { background: #2f8a4c; }
+.doc-block.vo      .badge { background: #c9a227; color: #2a2200; }
+.doc-block.sync    .badge { background: #b03d3d; }
+.doc-block.standup .badge { background: #7a4ba3; }
+.doc-block.life    .badge { background: #c4762a; }
+.doc-block.spiegel .badge { background: #8f4730; }
+.doc-main { flex: 1 1 auto; min-width: 0; }
+.doc-dur {
+    flex: 0 0 46px; text-align: right; padding-top: 3px;
+    font: 600 13px ui-monospace, Menlo, monospace; color: #57606a;
+}
+.doc-tools { flex: 0 0 auto; display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
 .doc-block:hover .doc-tools { opacity: 1; }
 .doc-tools button {
+    background: #e6e1d3; border: 1px solid #d3ccbb; color: #555; border-radius: 3px;
+    padding: 1px 6px; font-size: 12px; cursor: pointer;
     font-family: -apple-system, "Segoe UI", sans-serif;
-    background: #ece8dd; border: 1px solid #d7d1c3; color: #555; border-radius: 3px;
-    padding: 0 5px; font-size: 12px; line-height: 18px; cursor: pointer;
 }
-.doc-tools button:hover { background: #e0dac9; }
-.doc-fold {
-    position: absolute; left: 96px; top: 1px; cursor: pointer; color: #b3ac9c;
-    font-size: 12px; user-select: none; font-family: -apple-system, sans-serif;
-}
+.doc-tools button:hover { background: #dcd5c2; }
+/* текст блока */
 .doc-text {
     display: block; width: 100%; box-sizing: border-box;
     border: none; background: transparent; outline: none; resize: none; overflow: hidden;
-    font-family: inherit; font-size: 17px; line-height: 1.55; color: #16160f;
-    padding: 1px 0; min-height: 26px; margin: 0;
+    font-family: inherit; font-size: 16.5px; line-height: 1.5; color: #16160f;
+    padding: 2px 2px; min-height: 27px; margin: 0;
 }
 .doc-text::placeholder { color: #b4ac9a; font-style: italic; }
-.doc-block:focus-within .doc-text { background: rgba(45,106,159,.045); box-shadow: 0 0 0 3px rgba(45,106,159,.045); border-radius: 2px; }
-/* sync: спикер и должность — прямо в строке, «как текст» */
-.doc-sync-head { display: flex; gap: 6px; align-items: baseline; margin: 0 0 2px; }
-.doc-sync-head input {
-    border: none; background: transparent; outline: none; padding: 0;
-    font-family: inherit; font-size: 16px; color: #16160f; border-bottom: 1px dotted #b8b0a0;
+/* SOT: спикер жирным капсом перед репликой */
+.doc-speaker {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; margin: 0 0 1px;
+    font-family: -apple-system, "Segoe UI", sans-serif; text-transform: uppercase;
 }
-.doc-sync-head input.b-speaker { font-weight: 700; width: 240px; }
-.doc-sync-head input.b-role { font-style: italic; color: #555; width: 240px; }
-.doc-sync-head input:focus { border-bottom-color: var(--accent); }
+.doc-speaker .b-speaker {
+    border: none; background: transparent; outline: none; padding: 0;
+    font: 700 14px/1.4 -apple-system, "Segoe UI", sans-serif;
+    text-transform: uppercase; color: #16160f; width: 260px; max-width: 60%;
+    border-bottom: 1px dotted transparent;
+}
+.doc-speaker .sot-suf { font: 700 12px -apple-system, sans-serif; color: #6b7280; }
+.doc-speaker .b-role {
+    border: none; background: transparent; outline: none; padding: 0;
+    font: italic 400 12.5px/1.4 -apple-system, sans-serif; text-transform: none;
+    color: #555; width: 220px; max-width: 40%; border-bottom: 1px dotted transparent;
+}
+.doc-speaker input:focus { border-bottom-color: #b8b0a0; }
 /* части (фрагменты) */
-.doc-parts { margin: 4px 0 0; font-family: ui-monospace, Menlo, monospace; }
+.doc-parts { margin: 3px 0 0; font-family: ui-monospace, Menlo, monospace; }
 .doc-part {
     display: flex; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 3px;
-    font-size: 13px; color: #243; background: rgba(0,0,0,.035); border: 1px solid transparent;
+    font-size: 12.5px; background: rgba(0,0,0,.04); border: 1px solid transparent;
 }
-.doc-part + .doc-part { margin-top: 3px; }
+.doc-part + .doc-part { margin-top: 2px; }
 .doc-part:hover { border-color: #cfc9b8; }
 .doc-part .file { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #1f2937; }
 .doc-part .tc { color: #6b7280; }
 .doc-part button { background: none; border: none; cursor: pointer; color: #7a7365; font-size: 12px; padding: 0 3px; }
 .doc-part button:hover { color: #111; }
 .doc-pull {
-    margin-top: 3px; padding: 3px 6px; border: 1px dashed #b8b0a0; border-radius: 3px;
-    font-family: -apple-system, sans-serif; font-size: 12px; color: #7a7365; cursor: pointer;
+    margin-top: 3px; padding: 2px 6px; border: 1px dashed #b8b0a0; border-radius: 3px;
+    font: 12px -apple-system, sans-serif; color: #7a7365; cursor: pointer;
     background: transparent; width: 100%; text-align: left;
 }
-.doc-pull:hover { border-color: var(--accent); color: var(--accent); background: rgba(45,106,159,.06); }
-/* свёрнутый блок */
-.doc-block.folded .doc-body { display: none; }
-.doc-block.folded { margin-bottom: 6px; }
-.doc-foldsum { font-family: -apple-system, sans-serif; font-size: 12px; color: #9a9384; font-style: italic; }
-/* цвета меток типов */
-.doc-block.vo      .dot { background: #3d7bb0; } .doc-block.vo .lbl { color: #2f5f8a; }
-.doc-block.standup .dot { background: #8a5bb0; } .doc-block.standup .lbl { color: #6d4591; }
-.doc-block.sync    .dot { background: #b08a3d; } .doc-block.sync .lbl { color: #8a6c2c; }
-.doc-block.life    .dot { background: #3d9f6e; } .doc-block.life .lbl { color: #2f7d56; }
-.doc-block.spiegel .dot { background: #b05a3d; } .doc-block.spiegel .lbl { color: #8f4730; }
-.doc-block.vod     .dot { background: #3d9fb0; } .doc-block.vod .lbl { color: #2f7d8a; }
+.doc-pull:hover { border-color: #2f6ba0; color: #2f6ba0; background: rgba(47,107,160,.07); }
+/* свёрнутая строка */
+.doc-block.folded { padding-top: 2px; padding-bottom: 2px; }
+.doc-block.folded .doc-text, .doc-block.folded .doc-parts, .doc-block.folded .doc-pull,
+.doc-block.folded .doc-speaker { display: none; }
+.fold-sum { font-size: 13.5px; color: #8a8375; font-style: italic; padding: 2px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* меню смены типа */
+.kind-menu {
+    position: fixed; z-index: 120; display: flex; flex-direction: column; gap: 3px;
+    background: #fff; border: 1px solid #bdb7a8; border-radius: 6px;
+    padding: 5px; box-shadow: 0 10px 26px rgba(0,0,0,.25);
+}
+.kind-item { border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer;
+             color: #fff; font: 700 10.5px -apple-system, sans-serif; letter-spacing: .05em; text-align: left; }
+.kind-item.headline { background: #2f6ba0; } .kind-item.vod { background: #2f8a4c; }
+.kind-item.vo { background: #c9a227; color: #2a2200; } .kind-item.sync { background: #b03d3d; }
+.kind-item.standup { background: #7a4ba3; } .kind-item.life { background: #c4762a; }
+.kind-item.spiegel { background: #8f4730; }
+.kind-item.sel { outline: 2px solid #16160f; }
+/* кнопки тулбара — в цвет бейджей */
+.btn-headline { background: #2f6ba0; border-color: #4a86bb; }
+.btn-vod      { background: #2f8a4c; border-color: #49a566; }
+.btn-vo       { background: #c9a227; border-color: #d9b84e; color: #241f00; }
+.btn-sync     { background: #b03d3d; border-color: #c45c5c; }
+.btn-standup  { background: #7a4ba3; border-color: #936ab7; }
+.btn-life     { background: #c4762a; border-color: #d4914f; }
+.btn-spiegel  { background: #8f4730; border-color: #a86a52; }
+.btn-headline:hover, .btn-vod:hover, .btn-vo:hover, .btn-sync:hover,
+.btn-standup:hover, .btn-life:hover, .btn-spiegel:hover { filter: brightness(1.12); }
 
 /* панель поиска и индикатор текущего блока */
 .findbar { display: flex; align-items: center; gap: 8px; max-width: 860px; margin: 0 auto 10px;
@@ -165,16 +198,6 @@ main { padding: 0 16px 40px; }
 .findbar input { background: #14151a; }
 .findbar button { padding: 2px 10px; }
 .cur-block { font-size: 12px; color: var(--ok); font-weight: 600; min-width: 92px; }
-
-/* кнопки добавления блоков — в цвет метки соответствующего типа */
-.btn-vo      { background: #3d7bb0; border-color: #5a95c4; }
-.btn-standup { background: #8a5bb0; border-color: #a37ac2; }
-.btn-sync    { background: #b08a3d; border-color: #c4a35d; }
-.btn-life    { background: #3d9f6e; border-color: #5cb589; }
-.btn-spiegel { background: #b05a3d; border-color: #c47a5f; }
-.btn-vod     { background: #3d9fb0; border-color: #5cb5c4; }
-.btn-vo:hover, .btn-standup:hover, .btn-sync:hover, .btn-life:hover,
-.btn-spiegel:hover, .btn-vod:hover { filter: brightness(1.12); }
 
 /* монитор в стиле Source Monitor */
 .monitor { border: 1px solid var(--line); border-radius: 4px; padding: 8px; background: #17181a; }
