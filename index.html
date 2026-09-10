@@ -3,73 +3,226 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Сюжет-Студия</title>
+<title>OCTOPUS — Story</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<header>
-    <h1>Сюжет-Студия</h1>
-    <div class="head-actions">
-        <button id="btnSaveDraft">Черновик ↓</button>
-        <button id="btnLoadDraft">Черновик ↑</button>
-        <input type="file" id="draftFile" accept=".json" hidden>
-        <button id="btnImportWord" title="Вернуть правки редактора из его Word-файла (тексты)">Правка из Word ↑</button>
-        <input type="file" id="wordFile" accept=".doc,.docx,.htm,.html,.txt" hidden>
-        <select id="csvSep" title="Разделитель столбцов в CSV">
-            <option value=";" selected>CSV «;» (Fish Cutter)</option>
-            <option value="&#9;">TSV (табуляция)</option>
-            <option value=",">CSV «,» (Excel)</option>
-        </select>
-        <button id="btnExportCsv" class="accent">CSV для Fish Cutter</button>
-        <button id="btnExportDoc" class="accent">Word для редактора</button>
+<!-- ============================ GLOBAL TOP NAVIGATION ============================ -->
+<header id="topnav">
+    <div class="brand"><span class="brand-dot"></span>OCTOPUS</div>
+    <nav class="gnav">
+        <button class="gn" id="gnMetadata" data-view="metadata">Авторы</button>
+        <button class="gn" id="gnProject">Проект</button>
+        <button class="gn active" id="gnStory">Story</button>
+        <button class="gn">Resources</button>
+        <button class="gn">Planning</button>
+        <button class="gn">System</button>
+    </nav>
+    <span class="spacer"></span>
+    <label class="tn-search">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="ocGlobalSearch" placeholder="Search...">
+    </label>
+    <button class="ib" id="ocBell" title="Уведомления">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+    </button>
+    <button class="ib" id="ocHelp" title="Справка">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.2 9a2.8 2.8 0 0 1 5.4 1c0 1.9-2.6 2.3-2.6 4"/><path d="M12 17.5v.01"/></svg>
+    </button>
+    <button class="ib" id="ocApps" title="Приложения">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="5" r="1.6"/><circle cx="12" cy="5" r="1.6"/><circle cx="19" cy="5" r="1.6"/><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/><circle cx="5" cy="19" r="1.6"/><circle cx="12" cy="19" r="1.6"/><circle cx="19" cy="19" r="1.6"/></svg>
+    </button>
+    <div class="profile" title="Профиль">
+        <span class="avatar">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/></svg>
+        </span>
+        <span class="pf"><b>Иван Петров</b><i>Reporter</i></span>
     </div>
 </header>
 
-<!-- ================== ВЕРХНИЙ РЯД: РЕКВИЗИТЫ | ПЛЕЕР | ФАЙЛЫ ================== -->
-<section id="toprow">
-    <!-- РЕКВИЗИТЫ -->
-    <section id="requisites" class="card">
-        <div class="req-names">
-            <div><label>Название сюжета</label><input id="storyTitle" placeholder="ОЭМК: кислородная станция"></div>
-            <div><label>FPS таймкодов</label><input id="fpsInput" type="number" min="1" max="240" step="any" value="25"
-                 title="Частота кадров проекта. 25 / 29.97 / 50… — должна совпадать с секвенцией в Premiere"></div>
-            <div><label>Темп чтеца, зн/мин</label><input id="readSpeed" type="number" min="60" max="2400" step="10" value="540"
-                 title="Для оценки хронометража текстовых блоков (VO, LEAD, HEADLINE) без фрагментов. 540 ≈ телеграфный темп"></div>
-            <div>
-                <label>Корреспондент</label>
-                <div class="nf-row">
-                    <select id="fioReporter" data-role="корреспондента"></select>
-                    <button class="nf-gear" data-names="fioReporter" title="Изменить и удалить имена">⚙</button>
-                </div>
-            </div>
-            <div>
-                <label>Оператор</label>
-                <div class="nf-row">
-                    <select id="fioCam" data-role="оператора"></select>
-                    <button class="nf-gear" data-names="fioCam" title="Изменить и удалить имена">⚙</button>
-                </div>
-            </div>
-            <div>
-                <label>Монтажёр</label>
-                <div class="nf-row">
-                    <select id="fioEditor" data-role="монтажёра"></select>
-                    <button class="nf-gear" data-names="fioEditor" title="Изменить и удалить имена">⚙</button>
-                </div>
-            </div>
-        </div>
+<div id="workspace">
 
-        <div class="req-folder">
-            <label>Папка с исходниками видео</label>
-            <div class="row">
-                <button id="btnPickFolderCompat" class="accent">Исходники</button>
-                <span id="folderName" class="muted">не выбрана</span>
-            </div>
+<!-- ============================ LEFT: MY ASSIGNMENTS + NEWSWIRE ============================ -->
+<aside id="leftcol">
+    <section class="lp-sec" id="assignSec">
+        <h2 class="sec-title">MY ASSIGNMENTS</h2>
+        <div class="as-tools">
+            <select id="ocAsFilter">
+                <option value="all">All</option>
+                <option value="ASSIGNED">Assigned</option>
+                <option value="IN PROGRESS">In progress</option>
+                <option value="READY">Ready</option>
+                <option value="APPROVED">Approved</option>
+                <option value="ON AIR">Completed</option>
+            </select>
+            <input id="ocAsSearch" type="search" placeholder="Search assignments...">
         </div>
+        <div id="ocAsList" class="as-list"></div>
     </section>
+    <section class="lp-sec" id="wireSec">
+        <h2 class="sec-title">NEWSWIRE</h2>
+        <div class="as-tools">
+            <select id="ocWireFilter">
+                <option value="all">All agencies</option>
+                <option value="Правительство">Правительство</option>
+                <option value="ЦБ">ЦБ</option>
+                <option value="МЧС">МЧС</option>
+                <option value="Спорт">Спорт</option>
+                <option value="Общество">Общество</option>
+            </select>
+            <input id="ocWireSearch" type="search" placeholder="Search...">
+        </div>
+        <div id="ocWire" class="wire-list"></div>
+    </section>
+</aside>
 
-    <!-- ПЛЕЕР -->
-    <section id="playercol">
+<!-- ============================ CENTER: STORY EDITOR ============================ -->
+<main id="centercol">
+
+    <div id="storyHead">
+        <div class="sh-row">
+            <span id="ocStatusBadge" class="sb">ASSIGNED</span>
+            <input id="storyTitle" class="sh-title" placeholder="Название сюжета" title="Название сюжета">
+        </div>
+        <div class="sh-row sh-meta">
+            <span>ID:&nbsp;<b id="ocStoryId">—</b></span>
+            <span>SLUG:&nbsp;<b id="ocStorySlug">—</b></span>
+            <span>LAST MODIFIED:&nbsp;<b id="ocModified">—</b></span>
+            <span class="spacer"></span>
+            <div class="sh-actions">
+                <input type="file" id="draftFile" accept=".json" hidden>
+                <input type="file" id="wordFile" accept=".doc,.docx,.htm,.html,.txt" hidden>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs" id="ocTabs">
+        <button class="tab active" data-view="script">SCRIPT</button>
+        <button class="tab" data-view="summary">SUMMARY</button>
+        <button class="tab" data-view="sources">SOURCES</button>
+        <button class="tab" data-view="social">SOCIAL</button>
+    </div>
+
+    <div id="centerScroll">
+
+        <!-- ------------------ SCRIPT ------------------ -->
+        <div class="cview" id="view-script">
+            <div id="scriptToolbar">
+                <button id="btnAddHeadline" class="tb-btn headline" title="Добавить заголовок">+ HEADLINE</button>
+                <button id="btnAddVod"      class="tb-btn vod"      title="Добавить подводку/отвод">+ LEAD</button>
+                <button id="btnAddVO"       class="tb-btn vo"       title="Добавить закадровый текст">+ VO</button>
+                <button id="btnAddSync"     class="tb-btn sync"     title="Добавить синхрон">+ SOT</button>
+                <button id="btnAddStandup"  class="tb-btn standup"  title="Добавить стендап">+ STANDUP</button>
+                <button id="btnAddLife"     class="tb-btn life"     title="Добавить лайф">+ LIFE</button>
+                <button id="btnAddSpiegel"  class="tb-btn spiegel"  title="Добавить шпигель">+ SPIEGEL</button>
+                <span class="vsep"></span>
+                <button id="btnUndoTb" class="ib" title="Отменить (Ctrl+Z)">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3.5 13a9 9 0 1 0 2.3-6.4L3 9"/></svg>
+                </button>
+                <button id="btnRedoTb" class="ib" title="Вернуть (Ctrl+Shift+Z)">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M20.5 13a9 9 0 1 1-2.3-6.4L21 9"/></svg>
+                </button>
+                <button id="btnFind" class="ib" title="Поиск по тексту сюжета (Ctrl+F)">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                </button>
+                <button id="btnFoldAll" class="ib" title="Свернуть / развернуть все блоки">⤡ все</button>
+                <span class="spacer"></span>
+                <span id="totalDur" class="muted"></span>
+            </div>
+            <div id="findBar" class="findbar" hidden>
+                <input id="findInput" type="search" placeholder="Поиск по сюжету…  (Enter — далее, Shift+Enter — назад, Esc — закрыть)" style="flex:1; min-width:0">
+                <span id="findCount" class="muted"></span>
+                <button id="findPrev" title="Предыдущее (Shift+Enter)">↑</button>
+                <button id="findNext" title="Следующее (Enter)">↓</button>
+                <button id="findClose" title="Закрыть (Esc)">✕</button>
+            </div>
+            <div id="blocks"></div>
+            <div class="total-row"><span>TOTAL</span><b id="ocTotal">00:00</b></div>
+        </div>
+
+        <!-- ------------------ SUMMARY ------------------ -->
+        <div class="cview" id="view-summary" hidden>
+            <div id="ocSummary" class="prose"></div>
+        </div>
+
+        <!-- ------------------ АВТОРЫ (реквизиты, вкладка в верхнем меню) ------------------ -->
+        <div class="cview" id="view-metadata" hidden>
+            <div class="req-grid">
+                <div><label>FPS таймкодов</label><input id="fpsInput" type="number" min="1" max="240" step="any" value="25"
+                     title="Частота кадров проекта. 25 / 29.97 / 50… — должна совпадать с секвенцией в Premiere"></div>
+                <div><label>Темп чтеца, зн/мин</label><input id="readSpeed" type="number" min="60" max="2400" step="10" value="540"
+                     title="Для оценки хронометража текстовых блоков (VO, LEAD, HEADLINE) без фрагментов. 540 ≈ телеграфный темп"></div>
+                <div>
+                    <label>Корреспондент</label>
+                    <div class="nf-row">
+                        <select id="fioReporter" data-role="корреспондента"></select>
+                        <button class="nf-gear" data-names="fioReporter" title="Изменить и удалить имена">⚙</button>
+                    </div>
+                </div>
+                <div>
+                    <label>Оператор</label>
+                    <div class="nf-row">
+                        <select id="fioCam" data-role="оператора"></select>
+                        <button class="nf-gear" data-names="fioCam" title="Изменить и удалить имена">⚙</button>
+                    </div>
+                </div>
+                <div>
+                    <label>Монтажёр</label>
+                    <div class="nf-row">
+                        <select id="fioEditor" data-role="монтажёра"></select>
+                        <button class="nf-gear" data-names="fioEditor" title="Изменить и удалить имена">⚙</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ------------------ SOURCES ------------------ -->
+        <div class="cview" id="view-sources" hidden>
+            <div id="ocSources" class="src-list"></div>
+        </div>
+
+        <!-- ------------------ SOCIAL ------------------ -->
+        <div class="cview" id="view-social" hidden>
+            <div id="ocSocial" class="prose"></div>
+        </div>
+    </div>
+
+    <!-- ------------------ COLLABORATION ------------------ -->
+    <div id="collab">
+        <div class="tabs cl-tabs">
+            <button class="tab active" data-cl="comment">COMMENTS (<span id="clCount-comment">0</span>)</button>
+            <button class="tab" data-cl="suggestion">SUGGESTIONS (<span id="clCount-suggestion">0</span>)</button>
+            <button class="tab" data-cl="task">TASKS (<span id="clCount-task">0</span>)</button>
+        </div>
+        <div id="ocCollabList" class="cl-list"></div>
+        <div class="cl-input">
+            <input id="ocCommentText" placeholder="Write a comment...">
+            <span class="cl-icons">
+                <button id="ocAttach" class="ib" title="Вложение">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 12-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a1.5 1.5 0 0 1-2-2L16 9"/></svg>
+                </button>
+                <button id="ocMention" class="ib" title="Упомянуть">@</button>
+                <button id="ocEmoji" class="ib" title="Эмодзи">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5v.01M15 9.5v.01"/></svg>
+                </button>
+            </span>
+            <button id="ocPost" class="btn-new wide">Post</button>
+        </div>
+    </div>
+</main>
+
+<!-- ============================ RIGHT: MEDIA / SOTs / GRAPHICS / APPROVAL ============================ -->
+<aside id="rightcol">
+    <div class="tabs rc-tabs" id="ocMediaTabs">
+        <button class="tab active" data-mv="media">MEDIA</button>
+        <button class="tab" data-mv="sots">SOTs</button>
+        <button class="tab" data-mv="graphics">GRAPHICS</button>
+        <button class="tab" data-mv="approval">APPROVAL</button>
+    </div>
+
+    <div class="mview" id="mv-media">
+        <!-- МОНИТОР (Source Monitor): плеер + метки In/Out + транспорт -->
         <div class="monitor">
             <video id="player" preload="metadata"></video>
 
@@ -131,50 +284,36 @@
                 <button id="btnSend" class="accent">В сценарий →</button>
             </div>
         </div>
-    </section>
 
-    <!-- БРАУЗЕР ФАЙЛОВ -->
-    <section id="browser" class="card">
-        <h2>Файлы</h2>
-        <div class="row">
-            <button id="btnRescan">Обновить список</button>
-            <input type="search" id="videoSearch" placeholder="Поиск по имени…" style="flex:1; min-width:0">
-            <span class="view-toggle">
-                <button id="viewList" title="Списком">☰</button>
-                <button id="viewThumbs" title="Миниатюры">▦</button>
-                <button id="viewBig" title="Большие миниатюры">▣</button>
-            </span>
-        </div>
-        <div id="videoList" class="vl-list"></div>
-    </section>
-</section>
-
-<main>
-    <!-- ================== СЦЕНАРИЙ ================== -->
-    <section id="left">
-        <div class="row">
-            <button id="btnAddHeadline" class="btn-headline">+ HEADLINE</button>
-            <button id="btnAddVod" class="btn-vod">+ LEAD</button>
-            <button id="btnAddVO" class="btn-vo">+ VO</button>
-            <button id="btnAddSync" class="btn-sync">+ SOT</button>
-            <button id="btnAddStandup" class="btn-standup">+ STANDUP</button>
-            <button id="btnAddLife" class="btn-life">+ LIFE</button>
-            <button id="btnAddSpiegel" class="btn-spiegel">+ SPIEGEL</button>
+        <div class="mv-head">
+            <span class="mv-title">VIDEO (<b id="ocVidCount">0</b>)</span>
+            <span id="folderName" class="mv-dir muted" title="Папка исходников — меню «Проект» → «Папка исходников…»"></span>
             <span class="spacer"></span>
-            <button id="btnFind" title="Поиск по тексту сюжета (Ctrl+F)">🔍 Поиск</button>
-            <button id="btnFoldAll" title="Свернуть / развернуть все блоки">⤡ все</button>
-            <span id="totalDur" class="muted"></span>
+            <span class="view-toggle">
+                <button id="viewList" title="Списком">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <button id="viewThumbs" title="Миниатюры">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+                </button>
+                <button id="viewBig" title="Крупные миниатюры">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/></svg>
+                </button>
+            </span>
+            <button id="btnRescan" class="ib" title="Выбрать папку с исходниками (обновить список)">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 20h16"/></svg>
+            </button>
         </div>
-        <div id="findBar" class="findbar" hidden>
-            <input id="findInput" type="search" placeholder="Поиск по сюжету…  (Enter — далее, Shift+Enter — назад, Esc — закрыть)" style="flex:1; min-width:0">
-            <span id="findCount" class="muted"></span>
-            <button id="findPrev" title="Предыдущее (Shift+Enter)">↑</button>
-            <button id="findNext" title="Следующее (Enter)">↓</button>
-            <button id="findClose" title="Закрыть (Esc)">✕</button>
-        </div>
-        <div id="blocks"></div>
-    </section>
-</main>
+        <input type="search" id="videoSearch" placeholder="Search files…" class="mv-search">
+        <div id="videoList" class="vl-list"></div>
+    </div>
+
+    <div class="mview" id="mv-sots" hidden><div id="ocSots" class="mini-list"></div></div>
+    <div class="mview" id="mv-graphics" hidden><div id="ocGraphics" class="mini-list"></div></div>
+    <div class="mview" id="mv-approval" hidden><div id="ocApproval"></div></div>
+</aside>
+
+</div><!-- /#workspace -->
 
 <div id="toast"></div>
 
@@ -213,6 +352,8 @@
         <p class="muted wm-note">Импортируются только тексты блоков. Фрагменты, таймкоды и порядок блоков в Word не хранятся — они останутся как в сюжете.</p>
     </div>
 </div>
+
 <script src="js/app.js"></script>
+<script src="js/octopus.js"></script>
 </body>
 </html>

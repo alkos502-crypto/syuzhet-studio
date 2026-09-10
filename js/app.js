@@ -298,8 +298,8 @@ $("fpsInput").addEventListener("change", () => {
 
 /* ---------- выбор папки с видео (включая вложенные подпапки) ---------- */
 /* «Исходники»: <input webkitdirectory> — Chrome отдаёт готовые File,
-   getFile() не вызывается вовсе. Самый стабильный путь для сетевых томов (SMB). */
-$("btnPickFolderCompat").addEventListener("click", pickFolderCompat);
+   getFile() не вызывается вовсе. Самый стабильный путь для сетевых томов (SMB).
+   Вызов — из меню «Проект» и кнопки ⟳ (#btnRescan) */
 function releaseBlobUrls(keepRelPath) {
     videoFiles.forEach(f => {
         if (f.url && f.relPath !== keepRelPath) { URL.revokeObjectURL(f.url); f.url = null; }
@@ -363,8 +363,9 @@ function afterScan() {
     const n = videoFiles.length;
     let msg = "Найдено видео: " + n;
     /* корневое имя из webkitRelativePath («Папка/под/файл.mp4» → «Папка») */
+    let root = "";
     if (videoFiles.length) {
-        const root = (videoFiles[0].relPath.split("/")[0] || "").trim();
+        root = (videoFiles[0].relPath.split("/")[0] || "").trim();
         if (root) store.set("ss_dirname", root);
     }
     /* подпапки считаем по путям (имя корневой папки в webkitRelativePath отбрасываем) */
@@ -375,8 +376,8 @@ function afterScan() {
         return up.includes("/") ? up.slice(up.indexOf("/") + 1) : "";
     }).filter(Boolean));
     if (dirs.size) msg += " (в " + dirs.size + " подпапк" + (dirs.size % 10 === 1 && dirs.size % 100 !== 11 ? "е" : "ах") + ")";
-    $("folderName").textContent = "видео: " + n +
-        (dirs.size ? "  ·  подпапок: " + dirs.size : "");
+    $("folderName").textContent = root ? "«" + root + "»" +
+        (dirs.size ? "  ·  подпапок: " + dirs.size : "") : "";
     refreshVideoList();
     toast(msg, "ok");
 }
@@ -418,6 +419,8 @@ function pumpPosterQueue() {
         posterCache.set(ckOf(file), dataUrl || "");
         if (dataUrl && imgEl.isConnected) imgEl.style.backgroundImage = `url("${dataUrl}")`;
         else if (tileEl.isConnected) tileEl.classList.add("nothumb");
+        const dEl = tileEl.isConnected && tileEl.querySelector(".vl-dur");
+        if (dEl && file.dur) dEl.textContent = durTc(file.dur);
         posterBusy = false;
         pumpPosterQueue();
     });
@@ -430,6 +433,7 @@ async function grabFrame(file, cb) {
     const done = url2 => { v.removeAttribute("src"); v.load(); cb(url2); };
     const timer = setTimeout(() => done(""), 20000);   /* файл недоступен/медленный — не ждём вечно */
     v.onloadeddata = () => {
+        try { file.dur = v.duration; } catch (e) {}
         try { v.currentTime = Math.min(1, (v.duration || 1) / 2); } catch (e) { clearTimeout(timer); done(""); }
     };
     v.onseeked = () => {
@@ -477,8 +481,8 @@ function refreshVideoList() {
             el.className = "vl-tile" + (f.relPath === curRelPath ? " sel" : "");
             el.title = f.relPath;
             el.innerHTML = `
-                <div class="thumb"><div class="thumb-img"></div></div>
-                <span>${esc(label)}</span>`;
+                <div class="thumb"><div class="thumb-img"></div><span class="vl-dur">${f.dur ? durTc(f.dur) : ""}</span></div>
+                <span class="vl-name">${esc(label)}</span>`;
             el.onclick = () => loadVideo(f);
             host.appendChild(el);
             queuePoster(f, el.querySelector(".thumb-img"), el.querySelector(".thumb"));
@@ -516,7 +520,7 @@ async function loadVideo(f) {
     document.querySelectorAll(".vl-item.sel, .vl-tile.sel").forEach(x => x.classList.remove("sel"));
     const items = $("videoList").children;
     for (const it of items) {
-        const nm = it.classList.contains("vl-item") ? it.textContent : it.querySelector("span")?.textContent;
+        const nm = it.classList.contains("vl-item") ? it.textContent : it.querySelector(".vl-name")?.textContent;
         if (nm === f.relPath || nm === f.name) { it.classList.add("sel"); break; }
     }
     p.play().catch(() => {});
@@ -726,6 +730,7 @@ function newBlock(kind) {
         text: "",
         speaker: "", role: "",   /* только sync */
         folded: false,           /* блок свёрнут в строку (вид, на порядок не влияет) */
+        partsFolded: false,      /* список присоединённых фрагментов свёрнут (вид) */
         parts: []                /* {file,in,out}; несколько — у standup/sync/life/spiegel */
     };
 }
@@ -928,6 +933,7 @@ function pullPart(b) {
                videoFiles.find(v => v.name === curFile);
     if (vf) dupWarning(vf);
     b.parts.push({ file: curFile, in: markIn, out: markOut });
+    b.partsFolded = false;
     renderBlocks(); saveState();
     toast("Фрагмент добавлен в «" + blockTitle(b, typeNumbers()[b.id]) + "»", "ok");
     focusBlock(b.id, 99999);
@@ -986,7 +992,8 @@ function renderBlocks() {
         total += dur;
         const est = !(PART_KINDS.has(b.kind) && b.parts.length) && dur > 0;
         const div = document.createElement("div");
-        div.className = "doc-block " + b.kind + (b.folded ? " folded" : "");
+        div.className = "doc-block " + b.kind + (b.folded ? " folded" : "") +
+            (PART_KINDS.has(b.kind) ? " has-parts" + (b.partsFolded ? " parts-folded" : "") : "");
         div.dataset.id = b.id;
 
         const ph = b.kind === "headline" ? "Текст заголовки на экране…" :
@@ -1002,19 +1009,19 @@ function renderBlocks() {
             <button class="badge ${b.kind}" data-act="badge" title="Сменить тип блока">${esc(KIND_META[b.kind].badge)}</button>
             <div class="doc-main">
                 ${b.kind === "sync" ? `<div class="doc-speaker">
-                    <input class="b-speaker" placeholder="СПИКЕР — ФИО" value="${esc(b.speaker)}">
+                    <input class="b-speaker" placeholder="Спикер — ФИО" title="Как в титрах: сначала имя, затем фамилия — так же разбиваются колонки MOGRT" value="${esc(b.speaker)}">
                     <span class="sot-suf">(СИНХРОН)</span>
-                    <input class="b-role" placeholder="должность" value="${esc(b.role)}"></div>` : ""}
+                    <input class="b-role" placeholder="должность" title="Должность спикера" value="${esc(b.role)}"></div>` : ""}
                 ${foldsum}
                 <textarea class="doc-text" rows="1" placeholder="${ph}">${esc(b.text)}</textarea>
-                ${PART_KINDS.has(b.kind) ? `
-                <div class="doc-parts"></div>
-                <button class="doc-pull" data-act="pull" title="Или Alt+Enter в тексте блока">🎞 Добавить фрагмент из плеера (I/O)</button>` : ""}
+                ${PART_KINDS.has(b.kind) ? `<div class="doc-parts"></div>` : ""}
             </div>
-            <span class="doc-dur" title="${est ? "Оценка по длине текста (~9 зн/с, настраивается в шапке)" : "Сумма таймкодов фрагментов"}">${est ? "~" : ""}${durTc(dur)}</span>
+            <span class="doc-dur" title="${est ? "Оценка по длине текста (~9 зн/с, темп настраивается на вкладке «Авторы»)" : "Сумма таймкодов фрагментов"}">${est ? "~" : ""}${durTc(dur)}</span>
             <div class="doc-tools">
                 <button data-act="fold" title="Свернуть / развернуть">${b.folded ? "▸" : "▾"}</button>
-                <button data-act="dup" title="Дублировать">⧉</button>
+                ${PART_KINDS.has(b.kind) ? `
+                <button data-act="parts" class="doc-parts-toggle${b.partsFolded ? " folded" : ""}" title="Свернуть / развернуть присоединённые фрагменты">🎞${b.parts.length || ""} ${b.partsFolded ? "▸" : "▾"}</button>
+                <button class="doc-pull" data-act="pull" title="Добавить фрагмент из плеера (I / O) — или Alt+Enter в тексте блока">🎞 +</button>` : ""}
                 <button data-act="del" title="Удалить">✕</button>
             </div>
         `;
@@ -1049,9 +1056,8 @@ function renderBlocks() {
         });
 
         const ta = div.querySelector(".doc-text");
-        autogrow(ta);
         ta.addEventListener("input", () => { histTyping(); b.text = ta.value; autogrow(ta); saveState(); refreshDur(i); });
-        ta.addEventListener("focus", () => setCurrentBlock(b.id));
+        ta.addEventListener("focus", () => { setCurrentBlock(b.id); autogrow(ta); });
         ta.addEventListener("keydown", e => {
             if ((e.key === " " || e.key === "Enter") && docTrigger(ta, b, i)) { e.preventDefault(); return; }
             if (e.key === "Backspace" && ta.selectionStart === 0 && ta.selectionEnd === 0 && docMergePrev(b, i)) { e.preventDefault(); return; }
@@ -1069,7 +1075,7 @@ function renderBlocks() {
             if (act === "badge") { showKindMenu(b, e.target.closest(".badge")); return; }
             if (act === "goto" || act === "del-part" || act === "pull") return;
             if (act === "fold") b.folded = !b.folded;
-            if (act === "dup") { histBefore(); state.blocks.splice(i + 1, 0, JSON.parse(JSON.stringify({ ...b, id: state.nextId++ }))); }
+            if (act === "parts") b.partsFolded = !b.partsFolded;
             if (act === "del") {
                 if (!confirm("Удалить блок «" + blockTitle(b, nums[b.id]) + "» со всеми фрагментами?")) return;
                 histBefore();
@@ -1079,6 +1085,7 @@ function renderBlocks() {
         });
         div.querySelector('[data-act=pull]')?.addEventListener("click", () => pullPart(b));
         host.appendChild(div);
+        autogrow(ta);
     });
 
     if (currentBlockId) {
@@ -1143,6 +1150,7 @@ $("btnSend").addEventListener("click", () => {
     if (!PART_KINDS.has(b.kind)) return toast("Этот блок — только текст. Фрагменты — в SOT, стендап, лайф или шпигель", "err");
     if (vf) dupWarning(vf);
     b.parts.push({ file: curFile, in: markIn, out: markOut });
+    b.partsFolded = false;
     const nums = typeNumbers();
     renderBlocks(); saveState();
     toast("Добавлено в «" + blockTitle(b, nums[b.id]) + "»", "ok");
@@ -1235,9 +1243,8 @@ $("findClose").onclick = closeSearch;
 $("btnFind").onclick = () => $("findBar").hidden ? openSearch() : closeSearch();
 
 /* ---------- экспорт: CSV для Fish Cutter (разделитель на выбор, экранирование) ---------- */
-function buildCsv() {
+function buildCsv(sep) {
     const r = resolveNameValue("fioReporter"), c = resolveNameValue("fioCam"), ed = resolveNameValue("fioEditor");
-    const sep = $("csvSep").value;
     const cell = s => {
         s = String(s);
         return (s.includes(sep) || /["\n\r]/.test(s)) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -1342,17 +1349,54 @@ function download(name, content, mime) {
 function slug(s) {
     return (s || "сюжет").replace(/[^\wа-яёА-ЯЁ\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 60);
 }
-$("btnExportCsv").onclick = () => {
+function exportCsv(sep) {
     if (!state.blocks.length) return toast("Сценарий пуст", "err");
-    download(slug($("storyTitle").value) + "_fishcutter.csv", buildCsv(), "text/csv;charset=utf-8");
+    download(slug($("storyTitle").value) + "_fishcutter.csv", buildCsv(sep), "text/csv;charset=utf-8");
     toast("CSV сохранён — откройте его в Fish Cutter («Загрузить файл…»)", "ok");
-};
-$("btnExportDoc").onclick = () => {
+}
+function exportWord() {
     if (!state.blocks.length) return toast("Сценарий пуст", "err");
     download(slug($("storyTitle").value) + "_для_редактора.doc", buildDoc(),
              "application/msword;charset=utf-8");
     toast("Word-файл сохранён", "ok");
-};
+}
+
+/* ---------- экспорт: нижние титры для MOGRT (CSV по всем синхронам) ---------- */
+/* «Имя Фамилия [Отчество]» -> {last, first, mid}: 1-е слово — имя,
+   2-е — фамилия, остальные — отчество (подстраховка — колонка «спикер целиком») */
+function parseFio(s) {
+    const w = normWs(s).split(" ").filter(Boolean);
+    return { last: w[1] || "", first: w[0] || "", mid: w.slice(2).join(" ") };
+}
+function buildMogrtCsv(sep) {
+    const cell = s => {
+        s = String(s ?? "");
+        return (s.includes(sep) || /["\n\r]/.test(s)) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const row = (...cols) => cols.map(cell).join(sep === ";" ? "; " : sep);
+    const L = [];
+    L.push("# MOGRT — нижние титры, собрано в «Сюжет-Студии»");
+    L.push("# Сюжет: " + ($("storyTitle").value || "—"));
+    L.push("# Таймкод: NDF " + fpsVal() + " к/с; Дата: " + new Date().toISOString().slice(0, 10));
+    L.push("# Порядок = появление синхронов в сценарии; «вход» = таймкод первого фрагмента (момент появления плашки)");
+    L.push("#");
+    L.push(row("№", "фамилия", "имя", "отчество", "должность", "вход", "спикер целиком"));
+    let syN = 0;
+    state.blocks.forEach(b => {
+        if (b.kind !== "sync") return;
+        syN++;
+        const f = parseFio(b.speaker);
+        L.push(row(syN, f.last, f.first, f.mid, b.role || "",
+                   b.parts.length ? tc(b.parts[0].in) : "", b.speaker || ""));
+    });
+    return "\uFEFF" + L.join("\r\n");
+}
+function exportMogrt(sep) {
+    const n = state.blocks.filter(b => b.kind === "sync").length;
+    if (!n) return toast("В сценарии нет синхронов (SOT)", "err");
+    download(slug($("storyTitle").value) + "_mogrt.csv", buildMogrtCsv(sep), "text/csv;charset=utf-8");
+    toast("Файл титров для MOGRT сохранён (синхронов: " + n + ")", "ok");
+}
 
 /* ---------- черновик JSON + автосохранение ---------- */
 const KINDS = new Set(["headline", "vo", "standup", "sync", "life", "spiegel", "vod"]);
@@ -1368,6 +1412,7 @@ function normalizeBlocks(arr) {
             w: typeof b.w === "string" ? b.w : "",
             h: typeof b.h === "string" ? b.h : "",
             folded: !!b.folded,
+            partsFolded: !!b.partsFolded,
             parts: ((b.kind === "vod" || b.kind === "vo") || !Array.isArray(b.parts) ? [] : b.parts)
                 .filter(p => p && typeof p.file === "string" &&
                              Number.isFinite(+p.in) && Number.isFinite(+p.out) && +p.out > +p.in && +p.in >= 0)
@@ -1391,11 +1436,12 @@ function loadDraftData(d) {
     renderBlocks();
     return true;
 }
-$("btnSaveDraft").onclick = () =>
+function saveDraft() {
     download(slug($("storyTitle").value) + "_черновик.json",
              JSON.stringify({ blocks: state.blocks, nextId: state.nextId, req: store.get("ss_req", {}) }, null, 1),
              "application/json");
-$("btnLoadDraft").onclick = () => $("draftFile").click();
+}
+function loadDraft() { $("draftFile").click(); }
 $("draftFile").onchange = e => {
     const f = e.target.files[0];
     if (!f) return;
@@ -1409,7 +1455,7 @@ $("draftFile").onchange = e => {
 };
 
 /* ---------- импорт правок редактора из Word (тексты блоков) ---------- */
-$("btnImportWord").onclick = () => $("wordFile").click();
+function importWord() { $("wordFile").click(); }
 $("wordFile").onchange = e => {
     const f = e.target.files[0];
     e.target.value = "";
@@ -1678,9 +1724,6 @@ loadReq();
 /* сохранённые настройки панели «В сценарий» и экспорта */
 const savedMode = store.get("ss_sendmode", "");
 if (savedMode && [...$("sendMode").options].some(o => o.value === savedMode)) $("sendMode").value = savedMode;
-const savedSep = store.get("ss_sep", ";");
-if ([...$("csvSep").options].some(o => o.value === savedSep)) $("csvSep").value = savedSep;
-$("csvSep").addEventListener("change", () => store.set("ss_sep", $("csvSep").value));
 /* общий список ФИО из names.json — перерисовать select'ы после загрузки
    (refreshNameSelects сохранит восстановленный выбор) */
 loadSharedNames(refreshNameSelects);
@@ -1689,4 +1732,4 @@ if (!loadDraftData({ blocks: store.get("ss_blocks", []), nextId: store.get("ss_n
     renderBlocks();
 const savedDir = store.get("ss_dirname", "");
 if (savedDir)
-    $("folderName").textContent = `в прошлый раз: «${savedDir}» — выберите папку заново`;
+    $("folderName").textContent = `«${savedDir}» — выберите заново (Проект → Папка исходников)`;
