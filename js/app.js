@@ -1016,7 +1016,7 @@ function renderBlocks() {
                 <textarea class="doc-text" rows="1" placeholder="${ph}">${esc(b.text)}</textarea>
                 ${PART_KINDS.has(b.kind) ? `<div class="doc-parts"></div>` : ""}
             </div>
-            <span class="doc-dur" title="${est ? "Оценка по длине текста (~9 зн/с, темп настраивается на вкладке «Авторы»)" : "Сумма таймкодов фрагментов"}">${est ? "~" : ""}${durTc(dur)}</span>
+            <span class="doc-dur" title="${est ? "Оценка по длине текста (~" + Math.round(readCps()) + " зн/с, темп настраивается на вкладке «Авторы»)" : "Сумма таймкодов фрагментов"}">${est ? "~" : ""}${durTc(dur)}</span>
             <div class="doc-tools">
                 <button data-act="fold" title="Свернуть / развернуть">${b.folded ? "▸" : "▾"}</button>
                 ${PART_KINDS.has(b.kind) ? `
@@ -1421,8 +1421,11 @@ function normalizeBlocks(arr) {
 }
 function saveState() {
     saveReq();
-    store.set("ss_blocks", state.blocks);
-    store.set("ss_nextId", state.nextId);
+    /* пока оболочка OCTOPUS не подключена — дублируем в легаси-ячейку для миграции */
+    if (!Array.isArray(store.get("oc_stories", null))) {
+        store.set("ss_blocks", state.blocks);
+        store.set("ss_nextId", state.nextId);
+    }
 }
 function loadDraftData(d) {
     if (!d || !Array.isArray(d.blocks)) return false;

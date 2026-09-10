@@ -91,6 +91,8 @@ function loadStory(id) {
     if (!st) return;
     if (st.id !== OC.activeId) ocFlushNow();          /* довесохранить предыдущий */
     OC.activeId = st.id;
+    /* реквизиты (fps, темп, ФИО) — свои у каждого сюжета */
+    if (st.req && typeof st.req === "object") { store.set("ss_req", st.req); loadReq(); }
     state.blocks = normalizeBlocks(st.blocks);
     const maxId = Math.max(0, ...state.blocks.map(b => b.id));
     state.nextId = Math.max(st.nextId || 1, maxId + 1);
@@ -107,6 +109,7 @@ function ocFlushNow() {
     st.blocks = JSON.parse(JSON.stringify(state.blocks));
     st.nextId = state.nextId;
     st.title = $("storyTitle").value.trim();
+    st.req = store.get("ss_req", {});
     st.modified = nowHM();
     persistStories();
 }
@@ -233,7 +236,7 @@ function advanceStage() {
 
 /* ---------- COLLABORATION (comments / suggestions / tasks) ---------- */
 let clTab = "comment";
-const CL_LABEL = { comment: "комментарий", suggestion: "предложение", task: "задачу" };
+const CL_LABEL = { comment: "комментариев", suggestion: "предложений", task: "задач" };
 function renderCollab() {
     const st = active();
     st.comments = st.comments || [];
@@ -410,6 +413,32 @@ const _rfl = refreshVideoList;
 refreshVideoList = function () { _rfl(); $("ocVidCount").textContent = videoFiles.length; };
 const _os = openSearch;
 openSearch = function () { if ($("view-script").hidden) switchCenterTab("script"); _os(); };
+/* черновик .json — с метаданными сюжета (этап, даты, комментарии); id не переносим */
+saveDraft = function () {
+    const st = active();
+    download(slug($("storyTitle").value) + "_черновик.json",
+        JSON.stringify({ blocks: state.blocks, nextId: state.nextId, req: store.get("ss_req", {}),
+                         meta: { title: st.title, day: st.day, time: st.time, stage: st.stage,
+                                 stageDates: st.stageDates, targetSec: st.targetSec,
+                                 comments: st.comments, modified: st.modified } }, null, 1),
+        "application/json");
+    toast("Черновик сохранён (с этапом и комментариями)", "ok");
+};
+const _ldd = loadDraftData;
+loadDraftData = function (d) {
+    const ok = _ldd(d);
+    if (ok && d && d.meta && typeof d.meta === "object") {
+        const st = active();
+        if (d.meta.stage && OC.STAGES.includes(d.meta.stage)) st.stage = d.meta.stage;
+        if (d.meta.stageDates && typeof d.meta.stageDates === "object") st.stageDates = d.meta.stageDates;
+        if (Array.isArray(d.meta.comments)) st.comments = d.meta.comments;
+        if (Number.isFinite(+d.meta.targetSec) && +d.meta.targetSec > 0) st.targetSec = +d.meta.targetSec;
+        if (Number.isFinite(+d.meta.day)) st.day = +d.meta.day;
+        if (d.meta.time) st.time = d.meta.time;
+        ocFlushNow(); renderHead(); renderAssignments();
+    }
+    return ok;
+};
 
 /* верхняя навигация: «Авторы» — реквизиты, «Проект» — меню, остальные (кроме Story) — заглушки */
 document.querySelectorAll(".gnav .gn").forEach(b => {

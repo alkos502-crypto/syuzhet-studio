@@ -47,6 +47,16 @@ def clean_lists(payload):
 
 class Handler(SimpleHTTPRequestHandler):
 
+    @staticmethod
+    def _forbidden(path):
+        parts = [p for p in path.replace("\\", "/").split("/") if p]
+        return any(p == ".git" or p.startswith(".") or p.endswith(".bak") for p in parts)
+
+    def do_GET(self):
+        if self._forbidden(self.path.split("?", 1)[0]):
+            return self._json(403, {"error": "доступ запрещён"})
+        return super().do_GET()
+
     def do_POST(self):
         path = self.path.split("?", 1)[0].lstrip("/")
         if path != "names.json":
