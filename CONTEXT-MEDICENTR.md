@@ -208,6 +208,54 @@
   вся логика saveReq/loadReq/имён работает как прежде; `st.req` по-прежнему
   хранится per-story. Стили: `.sh-meta .nf-row`, `.sh-num`, `.sh-id`;
   `.req-grid` удалён.
+- **GUI: Graphite NLE + панельная архитектура (сессия 2026-09-14, К1–К5)**.
+  Дизайн-язык по практикам DaVinci Resolve 19 / Premiere Pro 2024:
+  - **К1 Токены**: палитра полностью переведена на нейтральный графит
+    (`--bg-0 #1a1a1a`, `--bg-1 #232323`, `--bg-2 #2b2b2b`, `--input-bg`,
+    `--ctl/--ctl-h`, `--line/--line-h`); единый акцент `--accent #4ea3ff`
+    (`--pr-blue` монитора = он же, старого `--blue #147BEA` нет); второй
+    акцент `--accent-2` (оранжевый) — предупреждения; `--ok/--warn/--err`;
+    clip-цвета блоков в `--k-headline…--k-spiegel` (приглушённые,badge/kind-menu/
+    mini-list берут их); `--r1/--r2`. Хардкод-цветов в CSS почти не осталось
+    (кроме `--pr-*` монитора и чёрного/белого). Кнопки borderless-вида
+    (рамка цвета фона), hover/active 120ms. Шкала шрифтов 10–14px (9/9.5/10.5/
+    11.5/12.5/13.5 убраны), `--text3 #8a8a8a` — AA на графите. В JS удалены
+    ссылки на несуществующие `var(--green)` (octopus, Rundown-таблица).
+  - **К2 A11y + шпаргалка**: три группы табов получили `role=tablist/tab/
+    tabpanel` + синхронизацию `aria-selected` в `switchCenterTab/
+    switchMediaTab/renderCollab`; aria-labels иконочных кнопок; `<details>
+    «Горячие клавиши»` из монитора удалён — вместо него модалка `#keysModal`
+    (полный список) по клавише `?` (вне полей ввода) и кнопке `#ocHelp`;
+    Esc/клик по фону закрывают.
+  - **К3 Панели**: компонент `.panel-sec > .panel-head(26px)+.panel-body` c
+    заголовками по-взрослому (нейминг B: рус.+латинизмы): **Монитор** (в шапке
+    имя файла `#monFile`, пишет `loadVideo`), **Медиабраузер** (`#ocVidCount`,
+    `#folderName`, view-toggle, `#btnRescan` переехали в шапку; старый
+    `.mv-head` удалён), **SOT-лист**, **Графика**, **Approval**, **Notes**
+    (бывш. collab). Кнопка `▾/▸` сворачивает body — состояние в localStorage
+    `ss_fold` (JSON-карта, НЕ модель данных). Активная панель (pointerdown) —
+    1px accent-линия сверху шапки. Таб «Обзор» → **«Rundown»** (id `view-summary`
+    прежний). **Блоки = клипы PP**: левый цветной rail 4px (`border-left-color`
+    по kind), бейдж 78→52px, длительность — белое mono в тёмной пилюле (зелёный
+    в UI теперь только «OK»), фокус-блок — inset accent-рамка.
+  - **К4 Статус-бар + сплиттер**: `footer#statusbar` (24px): `ИД · изм.`
+    (переехали из `.sh-id`, id прежние), `FPS #sbFps` (зеркало `#fpsInput`),
+    ИТОГО/план — `.total-row` перенесён из `#view-script` в бар (id `ocTotal`,
+    `ocTotalPlan` и обработчик «план ✎» не менялись), индикатор сохранения
+    `#sbSaved`: «…изменения» при `SS_HOOK.afterSave` → «✓ Ч:ММ сохранено» по
+    `ocFlushNow`/`renderHead`. `div#vsplit` между колонками: drag меняет
+    ширину rightcol (clamp 400px…70%), dblclick — сброс, ширина в `ss_rcw`.
+    Мёртвые topnav-кнопки «Ресурсы/Планирование/Система» удалены. Дубль
+    «Хронометраж: …» (`#totalDur`) из тулбара убран (строка в app.js
+    защищена фолбэком).
+  - **К5 Project Panel-практики**: красный «used-dot» у файлов/плиток, чей
+    relPath встречается в `parts[]` блоков (`usedPathSet()/updateUsedDots()`
+    в app.js; вызов — из `SS_HOOK.afterRender` и `refreshVideoList`);
+    offline-строки фрагментов (путь пропал из просканированной папки) —
+    `.doc-part.offline` красная штриховка + красноватое имя; selected-плитка —
+    accent-outline.
+  Id/ключи модели данных (`kind`, `stage`, `ss_req`, `oc_stories`…) не трогались.
+  Проверки: `node --check`, id-кросс-дифф JS↔HTML, `./make-win.sh` перегенерирован.
 
 ## 5. Правила при дальнейшей правке
 
