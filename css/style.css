@@ -167,6 +167,25 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .findbar input { background: var(--input-bg); }
 .findbar button { padding: 1px 8px; }
 
+/* ---- мини-таймлайн структуры эфира ---- */
+.mini-tl {
+    display: flex; gap: 2px; height: 14px;
+    position: sticky; top: 42px; z-index: 4;
+    margin: -8px -14px 8px; padding: 0 14px 8px; background: var(--bg-1);
+}
+.mt-seg { flex: 1 1 0; min-width: 4px; border-radius: 2px; cursor: pointer; opacity: .85; }
+.mt-seg:hover { opacity: 1; filter: brightness(1.2); }
+.mt-seg.dragging { opacity: .35; }
+.mt-seg.mt-before { box-shadow: inset 3px 0 0 var(--accent); }
+.mt-seg.mt-after  { box-shadow: inset -3px 0 0 var(--accent); }
+.mt-seg.headline { background: var(--k-headline); }
+.mt-seg.vod      { background: var(--k-vod); }
+.mt-seg.vo       { background: var(--k-vo); }
+.mt-seg.sync     { background: var(--k-sync); }
+.mt-seg.standup  { background: var(--k-standup); }
+.mt-seg.life     { background: var(--k-life); }
+.mt-seg.spiegel  { background: var(--k-spiegel); }
+
 /* ============================ SCRIPT BLOCKS ============================ */
 #blocks { background: var(--bg-1); min-height: 50vh; padding: 2px 0 8px; }
 #blocks .empty-hint { color: var(--text3); font-size: 13px; font-style: italic; padding: 14px 10px; }

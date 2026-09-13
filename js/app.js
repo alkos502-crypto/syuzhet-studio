@@ -1065,6 +1065,8 @@ function dragCleanup() {
     dragBlockId = null;
     document.querySelectorAll("#blocks .dragging, #blocks .drop-before, #blocks .drop-after")
         .forEach(el => el.classList.remove("dragging", "drop-before", "drop-after"));
+    document.querySelectorAll("#miniTl .dragging, #miniTl .mt-before, #miniTl .mt-after")
+        .forEach(el => el.classList.remove("dragging", "mt-before", "mt-after"));
     document.querySelectorAll("#blocks .doc-block").forEach(el => { el.draggable = false; });
 }
 /* вставка перед позицией to (0..blocks.length) */
@@ -1097,6 +1099,68 @@ document.addEventListener("mouseup", e => {
     if (dragBlockId === null && e.target.closest && !e.target.closest(".badge")) return;
     dragCleanup();
 });
+
+/* ---------- мини-таймлайн: структура эфира, ширина ∝ хронометражу ---------- */
+function updateMiniTl() {
+    const bar = $("miniTl");
+    if (!bar) return;
+    if (!state.blocks.length) { bar.hidden = true; bar.innerHTML = ""; return; }
+    bar.hidden = false;
+    bar.innerHTML = state.blocks.map(b => {
+        const dur = blockDur(b);
+        const t = (b.text || "").replace(/\s+/g, " ").trim();
+        const sp = b.kind === "sync" && b.speaker ? " · " + b.speaker : "";
+        return `<div class="mt-seg ${b.kind}" draggable="true" data-mt="${b.id}" style="flex-grow:${Math.max(dur, 1)}"
+            title="${esc(KIND_META[b.kind].badge)} · ${durTc(dur) || "—"}${esc(sp)}${t ? " · " + esc(t.slice(0, 80)) : ""}"></div>`;
+    }).join("");
+}
+function mtJump(id) {
+    const el = document.querySelector('#blocks .doc-block[data-id="' + id + '"]');
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    const ta = el.querySelector(".doc-text");
+    if (ta && !el.classList.contains("folded")) ta.focus();
+}
+function mtIndexAt(seg, e) {
+    const idx = state.blocks.findIndex(x => x.id === +seg.dataset.mt);
+    const before = e.clientX < seg.getBoundingClientRect().left + seg.offsetWidth / 2;
+    return { idx, before };
+}
+$("miniTl").addEventListener("click", e => {
+    const seg = e.target.closest(".mt-seg");
+    if (seg) mtJump(+seg.dataset.mt);
+});
+$("miniTl").addEventListener("dragstart", e => {
+    const seg = e.target.closest(".mt-seg");
+    if (!seg) return;
+    dragBlockId = +seg.dataset.mt;
+    e.dataTransfer.setData("text/plain", "mt:" + dragBlockId);
+    e.dataTransfer.effectAllowed = "move";
+    seg.classList.add("dragging");
+});
+$("miniTl").addEventListener("dragover", e => {
+    if (dragBlockId === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const seg = e.target.closest(".mt-seg");
+    document.querySelectorAll("#miniTl .mt-before, #miniTl .mt-after")
+        .forEach(x => x.classList.remove("mt-before", "mt-after"));
+    if (!seg || +seg.dataset.mt === dragBlockId) return;
+    const { before } = mtIndexAt(seg, e);
+    seg.classList.toggle("mt-before", before);
+    seg.classList.toggle("mt-after", !before);
+});
+$("miniTl").addEventListener("drop", e => {
+    if (dragBlockId === null) return;
+    e.preventDefault();
+    const id = dragBlockId;
+    const seg = e.target.closest(".mt-seg");
+    let to = state.blocks.length;
+    if (seg) { const { idx, before } = mtIndexAt(seg, e); to = before ? idx : idx + 1; }
+    dragCleanup();
+    moveBlockTo(id, to);
+});
+$("miniTl").addEventListener("dragend", dragCleanup);
 
 /* заголовок блока для тостов/подтверждений/экспорта (внутренние русские имена) */
 function blockTitle(b, n) {
@@ -1452,6 +1516,7 @@ function renderBlocks() {
     const td = $("totalDur");          /* элемент убран в статус-бар; оставлен фолбэк на случай кэша */
     if (td) td.textContent = state.blocks.length
         ? "Хронометраж: " + (total > 0 ? durTc(total) + " (оценки с ~)" : "00:00") : "";
+    updateMiniTl();
     refreshTargets();
     SS_HOOK.afterRender();
 }
@@ -1464,6 +1529,7 @@ function refreshDur(i) {
     const est = !(PART_KINDS.has(b.kind) && b.parts.length) && dur > 0;
     const cell = el.querySelector(".doc-dur");
     if (cell) cell.textContent = (est ? "~" : "") + durTc(dur);
+    updateMiniTl();
 }
 
 /* цель для «В сценарий →»: существующие блоки + пункт «новый блок типа «как»» */
