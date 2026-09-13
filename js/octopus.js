@@ -563,7 +563,7 @@ function ocRefreshAll() {
 }
 
 /* ---------- точки расширения движка (app.js) — без переназначения его функций ---------- */
-SS_HOOK.afterRender = ocRefreshAll;
+SS_HOOK.afterRender = () => { ocRefreshAll(); updateUsedDots(); };
 SS_HOOK.afterSave = () => { sbDirty(); ocFlushSoon(); };
 SS_HOOK.afterVideoList = () => { $("ocVidCount").textContent = videoFiles.length; };
 SS_HOOK.beforeSearch = () => { if ($("view-script").hidden) switchCenterTab("script"); };

@@ -694,6 +694,17 @@ async function grabFrame(file, cb) {
     v.src = url;
 }
 
+function usedPathSet() {
+    const s = new Set();
+    state.blocks.forEach(b => (b.parts || []).forEach(p => s.add(p.path || p.file)));
+    return s;
+}
+/* метка «используется» (как красная точка в Project Panel Premiere) — без перестроения списка */
+function updateUsedDots() {
+    const used = usedPathSet();
+    document.querySelectorAll("#videoList [data-rel]").forEach(el =>
+        el.classList.toggle("used", used.has(el.dataset.rel)));
+}
 function refreshVideoList() {
     const host = $("videoList");
     host.innerHTML = "";
@@ -710,17 +721,19 @@ function refreshVideoList() {
             const dupCount = new Map();
             if (viewMode !== "list")
                 shown.forEach(f => dupCount.set(f.name, (dupCount.get(f.name) || 0) + 1));
+            const used = usedPathSet();
             shown.forEach(f => {
                 const el = document.createElement("div");
                 el.dataset.rel = f.relPath;
+                const usedCls = used.has(f.relPath) ? " used" : "";
                 if (viewMode === "list") {
-                    el.className = "vl-item" + (f.relPath === curRelPath ? " sel" : "");
+                    el.className = "vl-item" + (f.relPath === curRelPath ? " sel" : "") + usedCls;
                     el.textContent = f.relPath;
-                    el.title = f.relPath + "  (клик — открыть в плеере)";
+                    el.title = f.relPath + "  (клик — открыть в плеере)" + (usedCls ? " · используется в блоках" : "");
                 } else {
                     /* подпись: basename, а при дублях имён — с подпапкой */
-                    el.className = "vl-tile" + (f.relPath === curRelPath ? " sel" : "");
-                    el.title = f.relPath;
+                    el.className = "vl-tile" + (f.relPath === curRelPath ? " sel" : "") + usedCls;
+                    el.title = f.relPath + (usedCls ? " — используется в блоках" : "");
                     el.innerHTML = `
                         <div class="thumb"><div class="thumb-img"></div><span class="vl-dur">${f.dur ? durTc(f.dur) : ""}</span></div>
                         <span class="vl-name">${esc(dupCount.get(f.name) > 1 ? f.relPath : f.name)}</span>`;
@@ -1278,6 +1291,8 @@ function renderBlocks() {
     host.innerHTML = "";
     let total = 0;
     const nums = typeNumbers();
+    /* offline-проверка: папка просканирована, но пути фрагмента в ней нет */
+    const known = videoFiles.length ? new Set(videoFiles.map(v => v.relPath)) : null;
     if (!state.blocks.length) {
         host.innerHTML = '<div class="empty-hint">Документ пуст. Нажмите ПКМ по пустому месту — добавить блок, ' +
             'или наберите в новой строке «хед», «лид», «зк», «синх», «стенд», «лайф», «шпи» + пробел.</div>';
@@ -1325,9 +1340,10 @@ function renderBlocks() {
         const partsHost = div.querySelector(".doc-parts");
         if (partsHost) b.parts.forEach((p, pi) => {
             const pe = document.createElement("div");
-            pe.className = "doc-part";
+            const off = !!(known && !known.has(p.path || p.file));
+            pe.className = "doc-part" + (off ? " offline" : "");
             pe.innerHTML = `
-                <span class="file" title="${esc(p.path || p.file)}">${esc(p.file)}</span>
+                <span class="file" title="${esc(p.path || p.file)}${off ? " — файл не найден в папке исходников" : ""}">${esc(p.file)}</span>
                 <span class="tc">${tc(p.in)} → ${tc(p.out)}</span>
                 <span class="tc">${durHuman(p.out - p.in)}</span>
                 <button data-act="goto" title="Открыть в плеере" aria-label="Открыть фрагмент в плеере">▶</button>
