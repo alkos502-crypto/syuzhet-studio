@@ -159,7 +159,14 @@ function deleteStory(id) {
         OC.activeId = nxt.id;                 /* чтобы редактор не «дописался» в чужой сюжет */
         loadStory(nxt.id);
         persistStories(); renderHead();
-        toast("Сюжет удалён", "ok");
+        toast("Сюжет удалён", "ok", 6000, { fn: () => {
+            const ph = OC.stories.find(s => s !== st && s.title === "Новый сюжет" && !(s.blocks || []).length);
+            if (ph) OC.stories.splice(OC.stories.indexOf(ph), 1);   /* убрать автозаглушку, если её не трогали */
+            OC.stories.splice(Math.min(i, OC.stories.length), 0, st);
+            loadStory(st.id);
+            persistStories();
+            toast("Сюжет возвращён", "ok");
+        } });
     });
 }
 function duplicateStory(id) {
@@ -194,7 +201,8 @@ function showStoriesMenu(anchor) {
     const m = document.createElement("div");
     m.id = "storiesMenu"; m.className = "proj-menu st-menu";
     m.innerHTML = OC.stories.map(s => `
-        <button data-st-id="${s.id}" class="${s.id === OC.activeId ? "cur" : ""}">
+        <button data-st-id="${s.id}" class="${s.id === OC.activeId ? "cur" : ""}"
+            aria-current="${s.id === OC.activeId ? "true" : "false"}">
             <span class="st-name">${s.id === OC.activeId ? "✓ " : ""}${esc(s.title || "Без названия")}</span>
             <span class="st-mod">${esc(s.modified || "")}</span>
         </button>`).join("") +

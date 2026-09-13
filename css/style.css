@@ -570,6 +570,12 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     max-width: 80%; z-index: 200;
 }
 #toast.show { opacity: 1; }
+#toast.act { pointer-events: auto; }
+#toast .toast-act {
+    margin-left: 12px; background: transparent; border: 1px solid var(--line-h);
+    color: #fff; font-size: 12px; padding: 1px 10px; vertical-align: middle;
+}
+#toast .toast-act:hover { background: var(--ctl-h); }
 #toast.ok { background: #2c4527; }
 #toast.warn { background: #55401f; }
 #toast.err { background: #4f2523; }

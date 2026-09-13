@@ -86,12 +86,23 @@ function fpsVal() {
 }
 
 /* ---------- утилиты ---------- */
-function toast(msg, cls, ms) {
+/* action = {label?, fn} — кнопка «Отменить» внутри тоста (кликабельный режим .act) */
+function toast(msg, cls, ms, action) {
     const t = $("toast");
-    t.textContent = msg;
-    t.className = "show" + (cls ? " " + cls : "");
+    t.textContent = "";
+    const s = document.createElement("span");
+    s.textContent = msg;
+    t.appendChild(s);
+    if (action) {
+        const b = document.createElement("button");
+        b.className = "toast-act";
+        b.textContent = action.label || "Отменить";
+        b.onclick = () => { clearTimeout(t._h); t.className = ""; action.fn(); };
+        t.appendChild(b);
+    }
+    t.className = "show" + (cls ? " " + cls : "") + (action ? " act" : "");
     clearTimeout(t._h);
-    t._h = setTimeout(() => (t.className = ""), ms || 2600);
+    t._h = setTimeout(() => (t.className = ""), ms || (action ? 5000 : 2600));
 }
 
 /* секунды -> 00:01:12:05. Для дробных fps (29.97/59.94) кадры считаются от
@@ -1542,6 +1553,9 @@ function renderBlocks() {
                 if (!(await confirm2("Удалить блок?", "«" + blockTitle(b, nums[b.id]) + "» со всеми фрагментами."))) return;
                 histBefore();
                 state.blocks.splice(i, 1);
+                renderBlocks(); saveState(); refreshTargets();
+                toast("Блок «" + blockTitle(b, nums[b.id]) + "» удалён", "ok", 6000, { fn: () => doUndo() });
+                return;
             }
             renderBlocks(); saveState(); refreshTargets();
         });
