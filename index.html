@@ -354,6 +354,16 @@
     </div>
 </div>
 
+<!-- ====== палитра команд (Ctrl+K) ====== -->
+<div id="cmdPalette" class="modal" hidden>
+    <div class="modal-box cp-box">
+        <input id="cpInput" placeholder="Сюжет, блок, команда… (Word, CSV, MOGRT, папка…)"
+               autocomplete="off" spellcheck="false" aria-label="Командная строка">
+        <div id="cpList" class="cp-list" role="listbox"></div>
+        <p class="muted">↑↓ — выбор · Enter — выполнить · Esc — закрыть</p>
+    </div>
+</div>
+
 <!-- ====== шпаргалка горячих клавиш («?» / кнопка справки) ====== -->
 <div id="keysModal" class="modal" hidden>
     <div class="modal-box keys-box">
@@ -370,7 +380,8 @@
                     <div><dt><kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd></dt><dd>переместить блок</dd></div>
                     <div><dt><kbd>Backspace</kbd> в начале строки</dt><dd>слить с предыдущим блоком</dd></div>
                     <div><dt>клик по бейджу / свёрнутой строке</dt><dd>свернуть / развернуть</dd></div>
-                    <div><dt>drag бейджа</dt><dd>порядок блоков</dd></div>
+                    <div><dt>drag файла из Медиабраузера на блок</dt><dd>добавить целый файл в СИНХ/СТЕНД/ЛАЙФ/ШПИГ</dd></div>
+                    <div><dt>drag бейджа / сегмента мини-таймлайна</dt><dd>порядок блоков; клик по сегменту — перейти к блоку</dd></div>
                 </dl>
             </section>
             <section>
@@ -378,6 +389,7 @@
                 <dl>
                     <div><dt><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></dt><dd>отменить / вернуть</dd></div>
                     <div><dt><kbd>Ctrl</kbd>+<kbd>F</kbd></dt><dd>поиск по сюжету</dd></div>
+                    <div><dt><kbd>Ctrl</kbd>+<kbd>K</kbd></dt><dd>палитра команд: сюжеты, блоки, экспорты</dd></div>
                     <div><dt><kbd>Enter</kbd>/<kbd>Shift+Enter</kbd>, <kbd>Esc</kbd></dt><dd>в поиске: далее / назад / закрыть</dd></div>
                     <div><dt><kbd>ПКМ</kbd> в окне СИНХ/СТЕНД/ЛАЙФ/ШПИГ</dt><dd>фрагмент из плеера, копировать/вставить</dd></div>
                 </dl>

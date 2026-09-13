@@ -1600,6 +1600,7 @@ document.addEventListener("keydown", e => {
     if (mod && !e.altKey && /^(z|я)$/i.test(e.key)) { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return; }
     if (mod && !e.altKey && /^(y|н)$/i.test(e.key)) { e.preventDefault(); doRedo(); return; }
     if (mod && /^(f|а)$/i.test(e.key)) { e.preventDefault(); openSearch(); return; }
+    if (mod) return;   /* остальные Ctrl/Cmd-комбинации — не клавиши плеера (Ctrl+K берёт палитра) */
     const inField = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "");
     if (inField) return;
     const p = $("player");

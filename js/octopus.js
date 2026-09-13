@@ -656,7 +656,7 @@ $("gnProject").onclick = e => {
     }), 0);
 };
 document.addEventListener("keydown", e => {
-    if (e.key === "Escape") { closeProjMenu(); closeStoriesMenu(); if (!$("keysModal").hidden) closeKeys(); }
+    if (e.key === "Escape") { closeProjMenu(); closeStoriesMenu(); if (!$("keysModal").hidden) closeKeys(); if (!$("cmdPalette").hidden) cpClose(); }
     /* «?» вне полей ввода — шпаргалка горячих клавиш */
     if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const t = e.target;
@@ -672,6 +672,71 @@ function toggleKeys() { $("keysModal").hidden ? openKeys() : closeKeys(); }
 $("kmClose").onclick = closeKeys;
 $("keysModal").addEventListener("click", e => { if (e.target === $("keysModal")) closeKeys(); });
 $("ocHelp").onclick = toggleKeys;
+
+/* ---------- палитра команд (Ctrl+K) ---------- */
+let cpSel = 0, cpShown = [];
+function cpItems() {
+    const items = [];
+    OC.stories.forEach(s => items.push({ g: "Сюжет", t: s.title || "Без названия",
+        h: "#" + String(s.id).padStart(8, "0") + (s.id === OC.activeId ? " · открыт" : " · " + (s.modified || "")),
+        run: () => { if (s.id !== OC.activeId) { loadStory(s.id); toast("Открыт сюжет: " + active().title); } } }));
+    const nums = typeNumbers();
+    state.blocks.forEach(b => {
+        const txt = (b.text || "").replace(/\s+/g, " ").trim().slice(0, 60);
+        items.push({ g: "Блок", t: blockTitle(b, nums[b.id]), h: txt, run: () => gotoBlock(b.id) });
+    });
+    PJ_ITEMS.forEach(it => { if (!it.sep) items.push({ g: "Команда", t: it.lbl, h: it.title, run: it.fn }); });
+    items.push({ g: "Команда", t: "🔍 Поиск по сюжету", h: "Ctrl+F", run: () => openSearch() });
+    items.push({ g: "Команда", t: "⤡ Свернуть / развернуть все блоки", h: null, run: () => $("btnFoldAll").click() });
+    items.push({ g: "Команда", t: "⌨ Горячие клавиши", h: "?", run: openKeys });
+    return items;
+}
+function cpRender() {
+    const q = $("cpInput").value.trim().toLowerCase();
+    const all = cpItems();
+    cpShown = q ? all.filter(x => ((x.g + " " + x.t + " " + (x.h || "")).toLowerCase()).includes(q)) : all;
+    cpShown = cpShown.slice(0, 50);
+    cpSel = Math.max(0, Math.min(cpSel, cpShown.length - 1));
+    const host = $("cpList");
+    host.innerHTML = cpShown.length
+        ? cpShown.map((x, i) => `<div class="cp-item${i === cpSel ? " sel" : ""}" data-cp="${i}" role="option">
+              <span class="cp-grp">${x.g}</span><span class="cp-lbl">${esc(x.t)}</span>
+              <span class="cp-hint">${esc(x.h || "")}</span></div>`).join("")
+        : '<div class="cp-empty">Ничего не найдено</div>';
+    const sel = host.querySelector(".cp-item.sel");
+    if (sel) sel.scrollIntoView({ block: "nearest" });
+    host.querySelectorAll(".cp-item").forEach(el => el.onmousedown = e => { e.preventDefault(); cpRun(+el.dataset.cp); });
+}
+function cpRun(i) {
+    const x = cpShown[i];
+    if (!x) return;
+    cpClose();
+    setTimeout(() => x.run(), 0);
+}
+function cpOpen() {
+    if (!$("keysModal").hidden) closeKeys();
+    $("cmdPalette").hidden = false;
+    cpSel = 0;
+    $("cpInput").value = "";
+    cpRender();
+    $("cpInput").focus();
+}
+function cpClose() { $("cmdPalette").hidden = true; }
+$("cpInput").addEventListener("input", () => { cpSel = 0; cpRender(); });
+$("cpInput").addEventListener("keydown", e => {
+    if (e.key === "ArrowDown") { e.preventDefault(); e.stopPropagation(); cpSel++; cpRender(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); e.stopPropagation(); cpSel--; cpRender(); }
+    else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); cpRun(cpSel); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cpClose(); }
+});
+$("cmdPalette").addEventListener("click", e => { if (e.target === $("cmdPalette")) cpClose(); });
+document.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && /^(k|л)$/i.test(e.key) &&
+        $("askModal").hidden && $("namesModal").hidden) {
+        e.preventDefault();
+        $("cmdPalette").hidden ? cpOpen() : cpClose();
+    }
+});
 
 /* ---------- старт ---------- */
 window.addEventListener("beforeunload", () => { clearTimeout(ocFlushT); ocFlushNow(); });

@@ -689,3 +689,17 @@ kbd {
     background: var(--bg-1); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: var(--r1);
     padding: 0 5px; font: 11px var(--mono); color: var(--text);
 }
+
+/* ============================ палитра команд (Ctrl+K) ============================ */
+#cmdPalette { align-items: flex-start; }
+.cp-box { width: min(640px, 92vw); margin: 12vh auto 0; padding: 12px 14px 10px; }
+#cpInput { font-size: 14px; padding: 8px 10px; background: var(--input-bg); }
+.cp-list { margin: 6px 0 4px; max-height: 48vh; overflow-y: auto; }
+.cp-item { display: flex; align-items: baseline; gap: 10px; padding: 6px 8px; border-radius: var(--r1); cursor: pointer; }
+.cp-item.sel { background: var(--sel); }
+.cp-grp { flex: 0 0 78px; font: 600 10px sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); }
+.cp-item.sel .cp-grp { color: #9fc6ea; }
+.cp-lbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: var(--text); }
+.cp-hint { flex: 0 1 auto; max-width: 45%; font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-item.sel .cp-hint { color: #cfe4f7; }
+.cp-empty { padding: 10px; color: var(--text3); font-size: 12px; }
