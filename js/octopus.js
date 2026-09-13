@@ -421,12 +421,12 @@ function renderSummary() {
         return `<tr><td>${i + 1}</td><td>${KIND_META[b.kind].badge}</td>
             <td>${esc(b.kind === "sync" ? b.speaker || "—" : "")}</td>
             <td>${esc((b.text || "").replace(/\s+/g, " ").slice(0, 90))}</td>
-            <td style="text-align:right;font-family:var(--mono);color:var(--green)">${mmss(d)}</td></tr>`;
+            <td style="text-align:right;font-family:var(--mono);color:var(--text)">${mmss(d)}</td></tr>`;
     }).join("");
     $("ocSummary").innerHTML = `<h3>${esc(st.title || "Без названия")}</h3>
         <p class="muted">ИД: ${String(st.id).padStart(8, "0")} · ${esc(resolveNameValue("fioReporter") || "корреспондент не указан")}</p>
         ${state.blocks.length ? `<table><tr><th>#</th><th>Тип</th><th>Спикер</th><th>Текст</th><th>Длит.</th></tr>${rows}</table>
-        <p><b style="font-family:var(--mono);color:var(--green)">${mmss(total)}</b> — суммарный хронометраж</p>`
+        <p><b style="font-family:var(--mono);color:var(--text)">${mmss(total)}</b> — суммарный хронометраж</p>`
         : '<p class="muted">Сценарий пуст.</p>'}`;
 }
 function renderSources() {
