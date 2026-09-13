@@ -364,7 +364,6 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     width: 100%; aspect-ratio: 16 / 9; object-fit: contain;
     background: #000; border-radius: 0; display: block;
 }
-.monitor .keys { padding: 6px 10px; margin: 0; }
 .view-toggle { display: inline-flex; gap: 1px; }
 .view-toggle button {
     padding: 4px 8px; border-radius: 0; display: inline-flex; align-items: center;
@@ -479,10 +478,6 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     font-weight: 700; height: 24px; padding: 3px 10px; white-space: nowrap;
 }
 .transport #btnSend:hover { background: var(--accent-h); color: #0d1520; }
-.keys { font-size: 12px; color: var(--text2); margin: 4px 2px 6px; }
-.keys summary { cursor: pointer; }
-.keys ul { margin: 4px 0 0; padding-left: 18px; }
-.keys li { margin: 2px 0; }
 
 /* ============================ TOAST / MODAL ============================ */
 #toast {
@@ -599,3 +594,16 @@ button.danger:hover { background: #7a3a34; }
 /* ============================ ДОБАВЛЕНО: фокус и доступность ============================ */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .doc-text:focus-visible { outline: none; }
+
+/* ============================ шпаргалка горячих клавиш ============================ */
+.keys-box { width: min(880px, 94vw); }
+.keys-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; margin-top: 10px; }
+.keys-cols h3 { margin: 0 0 6px; font: 600 11px sans-serif; text-transform: uppercase; letter-spacing: .08em; color: var(--text3); }
+.keys-cols dl { margin: 0; }
+.keys-cols dl > div { display: flex; gap: 10px; align-items: baseline; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+.keys-cols dt { flex: 0 0 55%; font-size: 12px; color: var(--text); }
+.keys-cols dd { flex: 1; margin: 0; font-size: 12px; color: var(--text2); }
+kbd {
+    background: var(--bg-1); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: var(--r1);
+    padding: 0 5px; font: 11px var(--mono); color: var(--text);
+}

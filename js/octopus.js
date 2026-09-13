@@ -230,7 +230,10 @@ $("storyTitle").addEventListener("change", () => { ocFlushNow(); renderHead(); }
 let centerTab = "script";
 function switchCenterTab(name) {
     centerTab = name;
-    document.querySelectorAll("#ocTabs .tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
+    document.querySelectorAll("#ocTabs .tab").forEach(t => {
+        t.classList.toggle("active", t.dataset.view === name);
+        t.setAttribute("aria-selected", String(t.dataset.view === name));
+    });
     document.querySelectorAll(".cview").forEach(v => v.hidden = v.id !== "view-" + name);
     if (name === "summary") renderSummary();
     if (name === "sources") renderSources();
@@ -243,7 +246,10 @@ document.querySelectorAll("#ocTabs .tab").forEach(t =>
 let mediaTab = "media";
 function switchMediaTab(name) {
     mediaTab = name;
-    document.querySelectorAll("#ocMediaTabs .tab").forEach(t => t.classList.toggle("active", t.dataset.mv === name));
+    document.querySelectorAll("#ocMediaTabs .tab").forEach(t => {
+        t.classList.toggle("active", t.dataset.mv === name);
+        t.setAttribute("aria-selected", String(t.dataset.mv === name));
+    });
     document.querySelectorAll(".mview").forEach(v => v.hidden = v.id !== "mv-" + name);
     if (name === "sots") renderSots();
     if (name === "graphics") renderGraphics();
@@ -293,7 +299,10 @@ function renderCollab() {
     st.comments = st.comments || [];
     ["comment", "suggestion", "task"].forEach(k =>
         $("clCount-" + k).textContent = st.comments.filter(c => c.kind === k).length);
-    document.querySelectorAll(".cl-tabs .tab").forEach(t => t.classList.toggle("active", t.dataset.cl === clTab));
+    document.querySelectorAll(".cl-tabs .tab").forEach(t => {
+        t.classList.toggle("active", t.dataset.cl === clTab);
+        t.setAttribute("aria-selected", String(t.dataset.cl === clTab));
+    });
     let items = st.comments.filter(c => c.kind === clTab);
     if (clBlockFilter !== null) items = items.filter(c => c.blockId === clBlockFilter);
     const host = $("ocCollabList");
@@ -569,9 +578,23 @@ $("gnProject").onclick = e => {
         if (!menu.contains(ev.target) && ev.target !== $("gnProject")) { closeProjMenu(); document.removeEventListener("mousedown", h); }
     }), 0);
 };
-document.addEventListener("keydown", e => { if (e.key === "Escape") { closeProjMenu(); closeStoriesMenu(); } });
-["ocBell", "ocHelp", "ocApps"].forEach(id =>
+document.addEventListener("keydown", e => {
+    if (e.key === "Escape") { closeProjMenu(); closeStoriesMenu(); if (!$("keysModal").hidden) closeKeys(); }
+    /* «?» вне полей ввода — шпаргалка горячих клавиш */
+    if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const t = e.target;
+        if (/^(input|textarea|select)$/i.test(t.tagName) || t.isContentEditable) return;
+        e.preventDefault(); toggleKeys();
+    }
+});
+["ocBell", "ocApps"].forEach(id =>
     $(id).onclick = () => toast("Раздел в разработке", "warn"));
+function openKeys() { $("keysModal").hidden = false; $("kmClose").focus(); }
+function closeKeys() { $("keysModal").hidden = true; }
+function toggleKeys() { $("keysModal").hidden ? openKeys() : closeKeys(); }
+$("kmClose").onclick = closeKeys;
+$("keysModal").addEventListener("click", e => { if (e.target === $("keysModal")) closeKeys(); });
+$("ocHelp").onclick = toggleKeys;
 
 /* ---------- старт ---------- */
 window.addEventListener("beforeunload", () => { clearTimeout(ocFlushT); ocFlushNow(); });

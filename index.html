@@ -88,17 +88,17 @@
         <span class="muted">(лишние сюжеты: меню «Проект» → «Сюжеты…» → удалить)</span>
     </div>
 
-    <div class="tabs" id="ocTabs">
-        <button class="tab active" data-view="script">Сценарий</button>
-        <button class="tab" data-view="summary">Обзор</button>
-        <button class="tab" data-view="sources">Источники</button>
-        <button class="tab" data-view="social">Соцсети</button>
+    <div class="tabs" id="ocTabs" role="tablist" aria-label="Разделы сюжета">
+        <button class="tab active" role="tab" aria-selected="true" data-view="script">Сценарий</button>
+        <button class="tab" role="tab" aria-selected="false" data-view="summary">Обзор</button>
+        <button class="tab" role="tab" aria-selected="false" data-view="sources">Источники</button>
+        <button class="tab" role="tab" aria-selected="false" data-view="social">Соцсети</button>
     </div>
 
     <div id="centerScroll">
 
         <!-- ------------------ SCRIPT ------------------ -->
-        <div class="cview" id="view-script">
+        <div class="cview" id="view-script" role="tabpanel">
             <div id="scriptToolbar">
                 <button id="btnUndoTb" class="ib" title="Отменить (Ctrl+Z)">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3.5 13a9 9 0 1 0 2.3-6.4L3 9"/></svg>
@@ -128,29 +128,29 @@
         </div>
 
         <!-- ------------------ SUMMARY ------------------ -->
-        <div class="cview" id="view-summary" hidden>
+        <div class="cview" id="view-summary" hidden role="tabpanel">
             <div id="ocSummary" class="prose"></div>
         </div>
 
         <!-- ------------------ АВТОРЫ (реквизиты) — переехали в шапку сюжета ------------------ -->
 
         <!-- ------------------ SOURCES ------------------ -->
-        <div class="cview" id="view-sources" hidden>
+        <div class="cview" id="view-sources" hidden role="tabpanel">
             <div id="ocSources" class="src-list"></div>
         </div>
 
         <!-- ------------------ SOCIAL ------------------ -->
-        <div class="cview" id="view-social" hidden>
+        <div class="cview" id="view-social" hidden role="tabpanel">
             <div id="ocSocial" class="prose"></div>
         </div>
     </div>
 
     <!-- ------------------ COLLABORATION ------------------ -->
     <div id="collab">
-        <div class="tabs cl-tabs">
-            <button class="tab active" data-cl="comment">Комментарии (<span id="clCount-comment">0</span>)</button>
-            <button class="tab" data-cl="suggestion">Предложения (<span id="clCount-suggestion">0</span>)</button>
-            <button class="tab" data-cl="task">Задачи (<span id="clCount-task">0</span>)</button>
+        <div class="tabs cl-tabs" role="tablist" aria-label="Комментарии и задачи">
+            <button class="tab active" role="tab" aria-selected="true" data-cl="comment">Комментарии (<span id="clCount-comment">0</span>)</button>
+            <button class="tab" role="tab" aria-selected="false" data-cl="suggestion">Предложения (<span id="clCount-suggestion">0</span>)</button>
+            <button class="tab" role="tab" aria-selected="false" data-cl="task">Задачи (<span id="clCount-task">0</span>)</button>
         </div>
         <div id="ocCollabList" class="cl-list"></div>
         <div class="cl-input">
@@ -171,14 +171,14 @@
 
 <!-- ============================ RIGHT: MEDIA / SOTs / GRAPHICS / APPROVAL ============================ -->
 <aside id="rightcol">
-    <div class="tabs rc-tabs" id="ocMediaTabs">
-        <button class="tab active" data-mv="media">Медиа</button>
-        <button class="tab" data-mv="sots">Синхроны</button>
-        <button class="tab" data-mv="graphics">Графика</button>
-        <button class="tab" data-mv="approval">Утверждение</button>
+    <div class="tabs rc-tabs" id="ocMediaTabs" role="tablist" aria-label="Панели справа">
+        <button class="tab active" role="tab" aria-selected="true" data-mv="media">Медиа</button>
+        <button class="tab" role="tab" aria-selected="false" data-mv="sots">Синхроны</button>
+        <button class="tab" role="tab" aria-selected="false" data-mv="graphics">Графика</button>
+        <button class="tab" role="tab" aria-selected="false" data-mv="approval">Утверждение</button>
     </div>
 
-    <div class="mview" id="mv-media">
+    <div class="mview" id="mv-media" role="tabpanel">
         <!-- МОНИТОР (Source Monitor): плеер + метки In/Out + транспорт -->
         <div class="monitor">
             <video id="player" preload="metadata"></video>
@@ -194,39 +194,24 @@
             <div class="transport">
                 <span id="curTc" class="tc" title="Текущая позиция">00:00:00:00</span>
                 <span class="spacer"></span>
-                <button id="btnGoIn" class="ti" title="К In (Shift+I)" disabled>
+                <button id="btnGoIn" class="ti" title="К In (Shift+I)" aria-label="Перейти к In" disabled>
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M5 5h2.4v14H5zm15.5 0-9.2 7 9.2 7z"/></svg>
                 </button>
                 <button id="btnPlay" class="tp-play" title="Play/Pause (пробел)" aria-label="Play/Pause">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path class="i-play" d="M7 4.5 20 12 7 19.5z"/><path class="i-pause" d="M6.5 5h4v14h-4zm7 0h4v14h-4z"/></svg>
                 </button>
-                <button id="btnGoOut" class="ti" title="К Out (Shift+O)" disabled>
+                <button id="btnGoOut" class="ti" title="К Out (Shift+O)" aria-label="Перейти к Out" disabled>
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M19 5h-2.4v14H19zM3.5 5l9.2 7-9.2 7z"/></svg>
                 </button>
                 <span class="spacer"></span>
                 <span id="fileDur" class="tc muted" title="Длительность файла">—</span>
                 <span class="tsep"></span>
-                <button id="btnSetIn" class="mark in" title="Поставить In (I)">{ In</button>
-                <button id="btnSetOut" class="mark out" title="Поставить Out (O)">Out }</button>
+                <button id="btnSetIn" class="mark in" title="Поставить In (I)" aria-label="Поставить In">{ In</button>
+                <button id="btnSetOut" class="mark out" title="Поставить Out (O)" aria-label="Поставить Out">Out }</button>
                 <span id="curBlock" class="cur-block" title="Блок-цель кнопки «В сценарий →» (кликните в блок, чтобы сменить)"></span>
                 <button id="btnSend" class="accent" title="Отправить фрагмент In→Out в текущий блок сценария">В сценарий →</button>
-                <button id="btnClearMarks" class="ti" title="Сбросить к краям файла">✕</button>
+                <button id="btnClearMarks" class="ti" title="Сбросить к краям файла" aria-label="Сбросить метки In/Out">✕</button>
             </div>
-
-            <details class="keys">
-                <summary>Горячие клавиши</summary>
-                <ul>
-                    <li>I / O — In / Out; Shift+I / Shift+O — перейти к метке</li>
-                    <li>← → — шаг на кадр; Shift+← → — на секунду</li>
-                    <li>Пробел / K — пауза; J / L — шаг на секунду; P — циклический предпросмотр In→Out</li>
-                    <li>В тексте блока: Alt+↑/↓ — переместить; Alt+Enter — вставить фрагмент из плеера</li>
-                    <li>Порядок блоков: перетащить за бейдж; клик по бейджу или свёрнутой строке — свернуть/развернуть</li>
-                    <li>ПКМ в окне блока СИНХ/СТЕНД/ЛАЙФ/ШПИГ — добавить фрагмент из плеера, копировать/вставить</li>
-                    <li>Новая строка: «хед», «лид», «зк», «синх», «стенд», «лайф», «шпи» + пробел — новый блок</li>
-                    <li>ПКМ по пустому месту окна сценария — добавить блок нужного типа (в конец)</li>
-                    <li>Ctrl+F — поиск; Ctrl+Z / Ctrl+Shift+Z — отменить/вернуть; Esc — закрыть поиск</li>
-                </ul>
-            </details>
         </div>
 
         <div class="mv-head">
@@ -234,17 +219,17 @@
             <span id="folderName" class="mv-dir muted" title="Папка исходников — меню «Проект» → «Папка исходников…»; ⟳ перечитывает её без повторного выбора"></span>
             <span class="spacer"></span>
             <span class="view-toggle">
-                <button id="viewList" title="Списком">
+                <button id="viewList" title="Списком" aria-label="Вид: списком">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
-                <button id="viewThumbs" title="Миниатюры">
+                <button id="viewThumbs" title="Миниатюры" aria-label="Вид: миниатюры">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
                 </button>
-                <button id="viewBig" title="Крупные миниатюры">
+                <button id="viewBig" title="Крупные миниатюры" aria-label="Вид: крупные миниатюры">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/></svg>
                 </button>
             </span>
-            <button id="btnRescan" class="ib" title="Выбрать папку с исходниками (обновить список)">
+            <button id="btnRescan" class="ib" title="Выбрать папку с исходниками (обновить список)" aria-label="Выбрать папку с исходниками">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 20h16"/></svg>
             </button>
         </div>
@@ -252,9 +237,9 @@
         <div id="videoList" class="vl-list"></div>
     </div>
 
-    <div class="mview" id="mv-sots" hidden><div id="ocSots" class="mini-list"></div></div>
-    <div class="mview" id="mv-graphics" hidden><div id="ocGraphics" class="mini-list"></div></div>
-    <div class="mview" id="mv-approval" hidden><div id="ocApproval"></div></div>
+    <div class="mview" id="mv-sots" hidden role="tabpanel"><div id="ocSots" class="mini-list"></div></div>
+    <div class="mview" id="mv-graphics" hidden role="tabpanel"><div id="ocGraphics" class="mini-list"></div></div>
+    <div class="mview" id="mv-approval" hidden role="tabpanel"><div id="ocApproval"></div></div>
 </aside>
 
 </div><!-- /#workspace -->
@@ -310,6 +295,60 @@
             <span class="spacer"></span>
             <button id="askCancel">Отмена</button>
             <button id="askOk" class="accent">ОК</button>
+        </div>
+    </div>
+</div>
+
+<!-- ====== шпаргалка горячих клавиш («?» / кнопка справки) ====== -->
+<div id="keysModal" class="modal" hidden>
+    <div class="modal-box keys-box">
+        <div class="modal-head">
+            <h2>Горячие клавиши</h2>
+            <button id="kmClose" class="icon-x" title="Закрыть (Esc)" aria-label="Закрыть">✕</button>
+        </div>
+        <div class="keys-cols">
+            <section>
+                <h3>Сценарий · блоки</h3>
+                <dl>
+                    <div><dt>хед · лид · зк · синх · стенд · лайф · шпи + пробел</dt><dd>новый блок нужного типа на новой строке</dd></div>
+                    <div><dt><kbd>ПКМ</kbd> по пустому месту</dt><dd>добавить блок (в конец)</dd></div>
+                    <div><dt><kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd></dt><dd>переместить блок</dd></div>
+                    <div><dt><kbd>Backspace</kbd> в начале строки</dt><dd>слить с предыдущим блоком</dd></div>
+                    <div><dt>клик по бейджу / свёрнутой строке</dt><dd>свернуть / развернуть</dd></div>
+                    <div><dt>drag бейджа</dt><dd>порядок блоков</dd></div>
+                </dl>
+            </section>
+            <section>
+                <h3>Правка</h3>
+                <dl>
+                    <div><dt><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></dt><dd>отменить / вернуть</dd></div>
+                    <div><dt><kbd>Ctrl</kbd>+<kbd>F</kbd></dt><dd>поиск по сюжету</dd></div>
+                    <div><dt><kbd>Enter</kbd>/<kbd>Shift+Enter</kbd>, <kbd>Esc</kbd></dt><dd>в поиске: далее / назад / закрыть</dd></div>
+                    <div><dt><kbd>ПКМ</kbd> в окне СИНХ/СТЕНД/ЛАЙФ/ШПИГ</dt><dd>фрагмент из плеера, копировать/вставить</dd></div>
+                </dl>
+            </section>
+            <section>
+                <h3>Монитор · плеер</h3>
+                <dl>
+                    <div><dt><kbd>Пробел</kbd> / <kbd>K</kbd></dt><dd>воспроизведение / пауза</dd></div>
+                    <div><dt><kbd>J</kbd> / <kbd>L</kbd></dt><dd>шаг на секунду назад / вперёд</dd></div>
+                    <div><dt><kbd>←</kbd> / <kbd>→</kbd></dt><dd>шаг на кадр</dd></div>
+                    <div><dt><kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd></dt><dd>шаг на секунду</dd></div>
+                    <div><dt><kbd>I</kbd> / <kbd>O</kbd></dt><dd>поставить In / Out</dd></div>
+                    <div><dt><kbd>Shift</kbd>+<kbd>I</kbd>/<kbd>O</kbd></dt><dd>перейти к метке In / Out</dd></div>
+                    <div><dt><kbd>P</kbd></dt><dd>зацикленный предпросмотр In→Out</dd></div>
+                    <div><dt><kbd>Alt</kbd>+<kbd>Enter</kbd> в тексте блока</dt><dd>фрагмент In→Out в блок</dd></div>
+                </dl>
+            </section>
+            <section>
+                <h3>Сюжеты · проект</h3>
+                <dl>
+                    <div><dt><kbd>?</kbd></dt><dd>эта шпаргалка</dd></div>
+                    <div><dt><kbd>ПКМ</kbd> по сюжету в «Сюжеты…»</dt><dd>дублировать / удалить</dd></div>
+                    <div><dt>«Проект» → Сохранить…</dt><dd>черновик .json (блоки + реквизиты)</dd></div>
+                    <div><dt>⟳ в Медиабраузере</dt><dd>перечитать папку исходников</dd></div>
+                </dl>
+            </section>
         </div>
     </div>
 </div>
