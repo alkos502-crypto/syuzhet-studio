@@ -1449,7 +1449,8 @@ function renderBlocks() {
         const cur = state.blocks.find(x => x.id === currentBlockId);
         if (!cur) setCurrentBlock(null); else setCurrentBlock(cur.id);
     }
-    $("totalDur").textContent = state.blocks.length
+    const td = $("totalDur");          /* элемент убран в статус-бар; оставлен фолбэк на случай кэша */
+    if (td) td.textContent = state.blocks.length
         ? "Хронометраж: " + (total > 0 ? durTc(total) + " (оценки с ~)" : "00:00") : "";
     refreshTargets();
     SS_HOOK.afterRender();
