@@ -725,6 +725,7 @@ function refreshVideoList() {
             shown.forEach(f => {
                 const el = document.createElement("div");
                 el.dataset.rel = f.relPath;
+                el.draggable = true;          /* drag → блок СИНХ = добавить целый файл (К7) */
                 const usedCls = used.has(f.relPath) ? " used" : "";
                 if (viewMode === "list") {
                     el.className = "vl-item" + (f.relPath === curRelPath ? " sel" : "") + usedCls;
@@ -752,6 +753,15 @@ $("btnRescan").addEventListener("click", () => {
     if (dirHandle) { openDirHandle(); return; }
     pickFolder();
 });
+/* delegate drag-события списка: элементы пересоздаются при каждом refresh */
+$("videoList").addEventListener("dragstart", e => {
+    const it = e.target.closest("[data-rel]");
+    if (!it) return;
+    e.dataTransfer.setData("text/x-ss-file", it.dataset.rel);
+    e.dataTransfer.effectAllowed = "copy";
+});
+$("videoList").addEventListener("dragend", () =>
+    document.querySelectorAll("#blocks .drop-file").forEach(x => x.classList.remove("drop-file")));
 /* поиск по имени файла: мгновенная фильтрация; Esc — очистить */
 $("videoSearch").addEventListener("input", refreshVideoList);
 $("videoSearch").addEventListener("keydown", e => {
@@ -1063,8 +1073,8 @@ function showBlockCtxMenu(x, y, b, row) {
 let dragBlockId = null;
 function dragCleanup() {
     dragBlockId = null;
-    document.querySelectorAll("#blocks .dragging, #blocks .drop-before, #blocks .drop-after")
-        .forEach(el => el.classList.remove("dragging", "drop-before", "drop-after"));
+    document.querySelectorAll("#blocks .dragging, #blocks .drop-before, #blocks .drop-after, #blocks .drop-file")
+        .forEach(el => el.classList.remove("dragging", "drop-before", "drop-after", "drop-file"));
     document.querySelectorAll("#miniTl .dragging, #miniTl .mt-before, #miniTl .mt-after")
         .forEach(el => el.classList.remove("dragging", "mt-before", "mt-after"));
     document.querySelectorAll("#blocks .doc-block").forEach(el => { el.draggable = false; });
@@ -1311,6 +1321,19 @@ function pullPart(b) {
     toast("Фрагмент добавлен в «" + blockTitle(b, typeNumbers()[b.id]) + "»", "ok");
     focusBlock(b.id, 99999);
 }
+/* drag файла из Медиабраузера на блок СИНХ/СТЕНД/ЛАЙФ/ШПИГ — целый файл (править in/out на месте) */
+function addWholeFilePart(b, relPath) {
+    if (!PART_KINDS.has(b.kind)) return;
+    const vf = videoFiles.find(v => v.relPath === relPath);
+    if (!vf) return toast("Файл не найден в папке исходников: " + relPath, "err");
+    histBefore();
+    b.parts.push({ file: vf.name, path: vf.relPath, in: 0, out: vf.dur || 0 });
+    b.folded = false;
+    b.partsFolded = false;
+    renderBlocks(); saveState();
+    if (!vf.dur) toast("«" + vf.name + "» добавлен целым; длительность не распознана — поправьте таймкоды", "warn", 5000);
+    else toast("«" + vf.name + "» целым файлом → " + blockTitle(b, typeNumbers()[b.id]) + " (Ctrl+Z — отменить)", "ok");
+}
 
 /* ---------- Ctrl+Z / Ctrl+Y: снапшоты документа ---------- */
 const undoStack = [], redoStack = [];
@@ -1465,24 +1488,41 @@ function renderBlocks() {
             div.classList.add("dragging");
         });
         div.addEventListener("dragover", e => {
-            if (dragBlockId === null || dragBlockId === b.id) return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "move";
-            const before = e.clientY < div.getBoundingClientRect().top + div.offsetHeight / 2;
-            div.classList.toggle("drop-before", before);
-            div.classList.toggle("drop-after", !before);
+            if (dragBlockId !== null && dragBlockId !== b.id) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                const before = e.clientY < div.getBoundingClientRect().top + div.offsetHeight / 2;
+                div.classList.toggle("drop-before", before);
+                div.classList.toggle("drop-after", !before);
+                return;
+            }
+            /* dropEffect move при dragBlockId===null на чужом блоке — перемещение, иначе — файл из браузера */
+            if (dragBlockId === null && PART_KINDS.has(b.kind) &&
+                e.dataTransfer.types.indexOf("text/x-ss-file") >= 0) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "copy";
+                div.classList.add("drop-file");
+            }
         });
         div.addEventListener("dragleave", e => {
             if (e.relatedTarget && div.contains(e.relatedTarget)) return;  /* перешли на дочерний элемент */
-            div.classList.remove("drop-before", "drop-after");
+            div.classList.remove("drop-before", "drop-after", "drop-file");
         });
         div.addEventListener("drop", e => {
-            if (dragBlockId === null || dragBlockId === b.id) return;
-            e.preventDefault();
-            const id = dragBlockId;
-            const before = e.clientY < div.getBoundingClientRect().top + div.offsetHeight / 2;
-            dragCleanup();
-            moveBlockTo(id, before ? i : i + 1);
+            if (dragBlockId !== null && dragBlockId !== b.id) {
+                e.preventDefault();
+                const id = dragBlockId;
+                const before = e.clientY < div.getBoundingClientRect().top + div.offsetHeight / 2;
+                dragCleanup();
+                moveBlockTo(id, before ? i : i + 1);
+                return;
+            }
+            if (dragBlockId === null && e.dataTransfer.types.indexOf("text/x-ss-file") >= 0) {
+                e.preventDefault();
+                const rel = e.dataTransfer.getData("text/x-ss-file");
+                if (PART_KINDS.has(b.kind)) addWholeFilePart(b, rel);
+                else toast("Фрагменты бывают только в СИНХ / СТЕНД / ЛАЙФ / ШПИГ", "warn");
+            }
         });
         div.addEventListener("dragend", dragCleanup);
         div.addEventListener("click", async e => {

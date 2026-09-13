@@ -223,6 +223,8 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .doc-block.dragging { opacity: .35; }
 .doc-block.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
 .doc-block.drop-after  { box-shadow: inset 0 -3px 0 var(--accent); }
+/* drop-цель для файла из Медиабраузера (К7) */
+.doc-block.drop-file { background: rgba(255,154,60,.10); box-shadow: inset 0 0 0 1px var(--accent-2); }
 .doc-main { flex: 1 1 auto; min-width: 0; }
 .doc-dur {
     flex: 0 0 auto; min-width: 46px; text-align: right; margin-top: 3px;
