@@ -757,6 +757,8 @@ async function loadVideo(f) {
     p.src = url;
     curFile = f.name;
     curRelPath = f.relPath;
+    const mf = $("monFile");
+    if (mf) { mf.textContent = f.relPath; mf.title = f.relPath; }
     $("fileDur").textContent = "—";
     limitToMarks = false;
     previewLoop = false;

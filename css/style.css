@@ -170,15 +170,24 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 #blocks .empty-hint { color: var(--text3); font-size: 13px; font-style: italic; padding: 14px 10px; }
 .doc-block {
     display: flex; align-items: flex-start; gap: 10px;
-    padding: 5px 8px; margin: 0 -8px; border-radius: var(--r1);
+    padding: 5px 8px 5px 7px; margin: 0 -8px; border-radius: 3px;
+    border-left: 4px solid transparent;
     border-bottom: 1px solid rgba(255,255,255,.07);
 }
 .doc-block:hover { background: var(--hover); }
-.doc-block:focus-within { background: rgba(78,163,255,.08); }
+.doc-block:focus-within { background: rgba(78,163,255,.08); box-shadow: inset 0 0 0 1px var(--accent); }
+/* clip-rail: цветной кант по типу блока, как граница клипа в Premiere */
+.doc-block.headline { border-left-color: var(--k-headline); }
+.doc-block.vod     { border-left-color: var(--k-vod); }
+.doc-block.vo      { border-left-color: var(--k-vo); }
+.doc-block.sync    { border-left-color: var(--k-sync); }
+.doc-block.standup { border-left-color: var(--k-standup); }
+.doc-block.life    { border-left-color: var(--k-life); }
+.doc-block.spiegel { border-left-color: var(--k-spiegel); }
 .badge {
-    flex: 0 0 78px; margin-top: 3px; border: none; border-radius: var(--r1); cursor: pointer;
-    padding: 4px 2px; color: #fff; text-transform: uppercase;
-    font: 700 10px/1.25 Inter, sans-serif; letter-spacing: .05em; opacity: .95;
+    flex: 0 0 52px; margin-top: 3px; border: none; border-radius: 3px; cursor: pointer;
+    padding: 4px 1px; color: #fff; text-transform: uppercase;
+    font: 700 10px/1.25 Inter, sans-serif; letter-spacing: .02em; opacity: .95;
 }
 .badge:hover { opacity: 1; filter: brightness(1.12); }
 .doc-block.headline .badge { background: var(--k-headline); }
@@ -195,8 +204,10 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .doc-block.drop-after  { box-shadow: inset 0 -3px 0 var(--accent); }
 .doc-main { flex: 1 1 auto; min-width: 0; }
 .doc-dur {
-    flex: 0 0 46px; text-align: right; padding-top: 5px;
-    font: 600 12px var(--mono); color: var(--ok);
+    flex: 0 0 auto; min-width: 46px; text-align: right; margin-top: 3px;
+    padding: 2px 6px; background: var(--input-bg); border: 1px solid var(--line);
+    border-radius: var(--r1); font: 600 11px var(--mono); color: var(--text);
+    white-space: nowrap;
 }
 .doc-tools { flex: 0 0 auto; display: flex; gap: 2px; opacity: .75; transition: opacity .12s; align-items: flex-start; }
 .doc-block:hover .doc-tools, .doc-block:focus-within .doc-tools { opacity: 1; }
@@ -247,7 +258,7 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .doc-block.folded .doc-text, .doc-block.folded .doc-parts,
 .doc-block.folded .doc-parts-toggle,
 .doc-block.folded .doc-speaker { display: none; }
-.fold-sum { font-size: 13px; color: var(--text3); font-style: italic; padding: 2px;
+.fold-sum { font-size: 12px; color: var(--text2); padding: 2px;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kind-menu {
     position: fixed; z-index: 120; display: flex; flex-direction: column; gap: 3px;
@@ -302,7 +313,7 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .src-list .src-n { color: var(--text3); font: 11px var(--mono); }
 
 /* ============================ COLLABORATION ============================ */
-#collab { flex: 0 0 auto; border-top: 1px solid var(--line); background: var(--bg-1); }
+#collab { flex: 0 0 auto; margin: 0 14px 14px; }
 .cl-tabs { padding: 0 8px; }
 .cl-list { max-height: 108px; min-height: 26px; overflow-y: auto; padding: 4px 14px; font-size: 13px; }
 .cl-item { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
@@ -343,7 +354,7 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .mini-list .mi-main { flex: 1; min-width: 0; }
 .mini-list .mi-main b { display: block; font-size: 12px; text-transform: uppercase; }
 .mini-list .mi-main span { display: block; font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mini-list .mi-dur { font: 12px var(--mono); color: var(--ok); }
+.mini-list .mi-dur { font: 12px var(--mono); color: var(--text); }
 .mi-empty { color: var(--text3); font-size: 12px; padding: 8px 4px; }
 
 #approvalSteps { display: flex; flex-direction: column; gap: 6px; }
@@ -357,7 +368,6 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 /* ============================ МОНИТОР — стиль монитора источника Adobe Premiere ============================ */
 .monitor {
     --pr-bg: #252525; --pr-bar: #1b1b1b; --pr-btn: #333333; --pr-btn-h: #414141; --pr-blue: var(--accent);
-    border: 1px solid var(--line); border-radius: var(--r2); overflow: hidden;
     background: var(--pr-bg); padding: 0; color: #dadada;
 }
 .monitor #player {
@@ -366,20 +376,41 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 }
 .view-toggle { display: inline-flex; gap: 1px; }
 .view-toggle button {
-    padding: 4px 8px; border-radius: 0; display: inline-flex; align-items: center;
+    padding: 3px 7px; border-radius: 0; display: inline-flex; align-items: center;
     background: var(--ctl); border: 1px solid var(--ctl); color: var(--text2);
 }
 .view-toggle button:first-child { border-radius: var(--r1) 0 0 var(--r1); }
 .view-toggle button:last-child { border-radius: 0 var(--r1) var(--r1) 0; }
 .view-toggle button.on { background: var(--accent); border-color: var(--accent); color: #0d1520; }
-.mv-head { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; }
-.mv-title { font: 600 11px sans-serif; text-transform: uppercase; letter-spacing: .08em; color: #d4d4d4; }
-.mv-dir { font-size: 11px; flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-dir { font-size: 11px; flex: 0 1 auto; min-width: 0; max-width: 34%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mv-search { margin-bottom: 8px; font-size: 12px; }
+
+/* ============================ ПАНЕЛИ (.panel-sec) ============================ */
+.panel-sec {
+    border: 1px solid var(--line); border-radius: var(--r2); overflow: hidden;
+    background: var(--bg-1); display: flex; flex-direction: column;
+}
+.panel-sec + .panel-sec { margin-top: 10px; }
+.panel-head {
+    display: flex; align-items: center; gap: 8px; min-height: 26px; padding: 2px 5px 2px 9px;
+    background: var(--bg-2); border-bottom: 1px solid var(--line);
+    user-select: none; flex: 0 0 auto;
+}
+.panel-sec.active > .panel-head { box-shadow: inset 0 1px 0 var(--accent); }
+.ph-title { font: 600 11px/1 sans-serif; text-transform: uppercase; letter-spacing: .08em; color: #d4d4d4; white-space: nowrap; }
+.ph-title b { color: var(--text2); font-weight: 600; }
+.ph-file { font: 11px var(--mono); color: var(--text2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-fold { background: transparent; border: 1px solid transparent; color: var(--text3); width: 24px; height: 20px; padding: 0; font-size: 11px; }
+.ph-fold:hover { color: var(--text); background: var(--hover); }
+.panel-head button { font-size: 11px; }
+.panel-body { min-height: 0; padding: 8px; }
+.panel-body.pbb-flush { padding: 0; }
+/* свёрнутая панель: шапка без нижней рамки */
+.panel-head:has(+ .panel-body[hidden]) { border-bottom: none; }
 
 #videoList {
     border: 1px solid var(--line); border-radius: var(--r1); background: var(--input-bg);
-    overflow-y: auto; margin: 0 0 6px;
+    overflow-y: auto; margin: 0;
 }
 .vl-list { height: 280px; }
 .vl-list .vl-item {

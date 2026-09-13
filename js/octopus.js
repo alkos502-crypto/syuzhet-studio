@@ -258,6 +258,40 @@ function switchMediaTab(name) {
 document.querySelectorAll("#ocMediaTabs .tab").forEach(t =>
     t.onclick = () => switchMediaTab(t.dataset.mv));
 
+/* ---------- панели: сворачивание + активная (UI-only, ss_fold в localStorage) ---------- */
+function foldState() {
+    try { const s = JSON.parse(localStorage.getItem("ss_fold") || "{}"); return s && typeof s === "object" ? s : {}; }
+    catch (e) { return {}; }
+}
+function applyFolds() {
+    const fs = foldState();
+    document.querySelectorAll(".panel-sec").forEach(sec => {
+        const body = sec.querySelector(".panel-body"), btn = sec.querySelector(".ph-fold");
+        if (!body || !btn) return;
+        const folded = !!fs[sec.dataset.panel];
+        body.hidden = folded;
+        btn.textContent = folded ? "▸" : "▾";
+        const name = sec.querySelector(".ph-title").textContent.trim();
+        btn.setAttribute("aria-expanded", String(!folded));
+        btn.setAttribute("aria-label", (folded ? "Развернуть панель: " : "Свернуть панель: ") + name);
+    });
+}
+document.querySelectorAll(".ph-fold").forEach(b => b.onclick = () => {
+    const sec = b.closest(".panel-sec");
+    const fs = foldState();
+    fs[sec.dataset.panel] = !fs[sec.dataset.panel];
+    try { localStorage.setItem("ss_fold", JSON.stringify(fs)); } catch (e) {}
+    applyFolds();
+});
+/* активная панель — рамка-подсветка шапки, как в Premiere */
+document.addEventListener("pointerdown", e => {
+    const sec = e.target.closest(".panel-sec");
+    if (!sec || sec.classList.contains("active")) return;
+    document.querySelectorAll(".panel-sec.active").forEach(s => s.classList.remove("active"));
+    sec.classList.add("active");
+}, true);
+applyFolds();
+
 /* ---------- TOTAL (хронометраж + план из targetSec) ---------- */
 function mmssToSec(s) {
     s = String(s).replace(",", ".").trim();
