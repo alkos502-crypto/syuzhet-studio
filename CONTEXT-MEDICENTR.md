@@ -256,6 +256,33 @@
     accent-outline.
   Id/ключи модели данных (`kind`, `stage`, `ss_req`, `oc_stories`…) не трогались.
   Проверки: `node --check`, id-кросс-дифф JS↔HTML, `./make-win.sh` перегенерирован.
+- **GUI: интерактив §4 (сессия 2026-09-14, К6–К9)**.
+  - **К6 Мини-таймлайн**: `#miniTl` (sticky под `#scriptToolbar`, `top:42px`),
+    сегменты `.mt-seg` — ширина `flex-grow ∝ blockDur` (текстовые — оценка по
+    ТЕМП), цвет `var(--k-*)`; клик → скролл+фокус (`mtJump`), drag → тот же
+    `moveBlockTo` (`dragBlockId` общий с doc-block, `dragCleanup` чистит обе
+    зоны). Пересборка — `updateMiniTl()` в конце `renderBlocks` и в
+    `refreshDur` (живое обновление при наборе). Только view, данных не касается.
+  - **К7 Drag клипа → блок**: элементы `#videoList` теперь `draggable`,
+    `dragstart` кладёт `text/x-ss-file`=relPath; drop на `.has-parts`-блок →
+    `addWholeFilePart(b, rel)` — целый файл `in:0, out:vf.dur||0` в конец
+    `parts[]` (структура `{file,path,in,out}` не менялась), `histBefore()` →
+    Ctrl+Z. Подсветка цели `.drop-file` (оранжевый accent-2). В обработчик
+    плеерных клавиш app.js добавлен `if (mod) return;` — Ctrl/Meta больше не
+    «съедаются» J/K/L/P.
+  - **К8 Палитра Ctrl+K**: `#cmdPalette` (octopus.js): источники —
+    `OC.stories` (переключение), блоки (`blockTitle` → `gotoBlock`),
+    `PJ_ITEMS` (экспорты/файлы) + Поиск/Свернуть все/Шпаргалка. Фильтр —
+    подстрока по «группа+имя+подсказка», до 50, ↑↓/Enter/Esc/mousedown
+    (preventDefault — не теряет фокус). Открытие — keydown-слушатель в
+    octopus (`/^(k|л)$/` + mod); Esc-цепочка расширена.
+  - **К9 Undo-тосты + a11y-полировка**: `toast(msg, cls, ms, action)` —
+    4-й аргумент `{label?, fn}` рисует кнопку, тост получает класс `.act`
+    (pointer-events:auto), авто-мс 5000. Привязки: удаление блока → `doUndo()`;
+    удаление сюжета → возврат снимка (с очисткой автозаглушки «Новый сюжет») +
+    `loadStory`. `aria-current` в меню «Сюжеты…», `aria-label` у `#vsplit`.
+  - Из §5 не делал: 4-pt spacing scale (отложить до рефактора отступов);
+    вкладки «Источники/Соцсети» оставлены русскими (решение юзера).
 
 ## 5. Правила при дальнейшей правке
 
