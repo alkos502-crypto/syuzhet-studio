@@ -470,7 +470,7 @@ function gotoBlock(id) {
 }
 function miniRow(b, dur) {
     return `<div class="mi-item" data-goto="${b.id}">
-        <span class="badge ${b.kind} mi-badge">${KIND_META[b.kind].badge}</span>
+        <span class="badge ${b.kind} mi-badge">${badgeHtml(b.kind)}</span>
         <span class="mi-main"><b>${esc(b.speaker || (b.text || "").slice(0, 40))}</b><span>${esc((b.text || "").replace(/\s+/g, " ").slice(0, 80))}</span></span>
         <span class="mi-dur">${mmss(dur)}</span></div>`;
 }

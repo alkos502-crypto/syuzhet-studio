@@ -15,6 +15,9 @@
     /* clip colors блоков (приглушены под графит) */
     --k-headline: #2f7ccf; --k-vod: #44945f; --k-vo: #c3a64d;
     --k-sync: #df584f; --k-standup: #9471df; --k-life: #df8e20; --k-spiegel: #9a5d43;
+    /* light-варианты для текста на tinted-подложках (AA ≥4.5:1 к bg-1) */
+    --kt-headline: #7db4f2; --kt-vod: #7fd093; --kt-vo: #e6ca6e;
+    --kt-sync: #ff948c; --kt-standup: #bda0f5; --kt-life: #ffab5c; --kt-spiegel: #d99a76;
     --r1: 3px; --r2: 4px;
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -205,21 +208,32 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .doc-block.standup { border-left-color: var(--k-standup); }
 .doc-block.life    { border-left-color: var(--k-life); }
 .doc-block.spiegel { border-left-color: var(--k-spiegel); }
+/* бейдж = мягкая пилюля: код типа (EN, как в OCTOPUS) + пиктограмма; цвет-якорь дублирует rail */
 .badge {
-    flex: 0 0 52px; margin-top: 3px; border: none; border-radius: 3px; cursor: pointer;
-    padding: 4px 1px; color: #fff; text-transform: uppercase;
-    font: 700 10px/1.25 Inter, sans-serif; letter-spacing: .02em; opacity: .95;
+    flex: 0 0 96px; margin-top: 3px; display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--line); border-radius: 999px; cursor: grab; user-select: none;
+    padding: 3px 9px 3px 7px; text-transform: uppercase; color: var(--text2);
+    font: 700 10px/1.25 Inter, sans-serif; letter-spacing: .03em; white-space: nowrap;
+    background: rgba(255,255,255,.05);
+    transition: filter .12s ease-out, background-color .12s ease-out;
 }
-.badge:hover { opacity: 1; filter: brightness(1.12); }
-.doc-block.headline .badge { background: var(--k-headline); }
-.doc-block.vod     .badge { background: var(--k-vod); }
-.doc-block.vo      .badge { background: var(--k-vo); color: #241f00; }
-.doc-block.sync    .badge { background: var(--k-sync); }
-.doc-block.standup .badge { background: var(--k-standup); }
-.doc-block.life    .badge { background: var(--k-life); }
-.doc-block.spiegel .badge { background: var(--k-spiegel); }
-.doc-block .badge { cursor: grab; user-select: none; }
-.doc-block .badge:active { cursor: grabbing; }
+.badge:hover { filter: brightness(1.18); }
+.badge:active { cursor: grabbing; }
+/* tint-пары: подложка 14% + рамка 45% от clip-цвета, текст — light-вариант */
+.badge.headline { color: var(--kt-headline); border-color: rgba(47,124,207,.45);  background: rgba(47,124,207,.14);
+    border-color: color-mix(in srgb, var(--k-headline) 45%, transparent); background: color-mix(in srgb, var(--k-headline) 14%, var(--input-bg)); }
+.badge.vod      { color: var(--kt-vod);      border-color: rgba(68,148,95,.45);   background: rgba(68,148,95,.14);
+    border-color: color-mix(in srgb, var(--k-vod) 45%, transparent);      background: color-mix(in srgb, var(--k-vod) 14%, var(--input-bg)); }
+.badge.vo       { color: var(--kt-vo);       border-color: rgba(195,166,77,.45);  background: rgba(195,166,77,.12);
+    border-color: color-mix(in srgb, var(--k-vo) 45%, transparent);       background: color-mix(in srgb, var(--k-vo) 12%, var(--input-bg)); }
+.badge.sync     { color: var(--kt-sync);     border-color: rgba(223,88,79,.45);   background: rgba(223,88,79,.14);
+    border-color: color-mix(in srgb, var(--k-sync) 45%, transparent);     background: color-mix(in srgb, var(--k-sync) 14%, var(--input-bg)); }
+.badge.standup  { color: var(--kt-standup);  border-color: rgba(148,113,223,.45); background: rgba(148,113,223,.14);
+    border-color: color-mix(in srgb, var(--k-standup) 45%, transparent);  background: color-mix(in srgb, var(--k-standup) 14%, var(--input-bg)); }
+.badge.life     { color: var(--kt-life);     border-color: rgba(223,142,32,.45);  background: rgba(223,142,32,.13);
+    border-color: color-mix(in srgb, var(--k-life) 45%, transparent);     background: color-mix(in srgb, var(--k-life) 13%, var(--input-bg)); }
+.badge.spiegel  { color: var(--kt-spiegel);  border-color: rgba(154,93,67,.5);     background: rgba(154,93,67,.16);
+    border-color: color-mix(in srgb, var(--k-spiegel) 50%, transparent);  background: color-mix(in srgb, var(--k-spiegel) 16%, var(--input-bg)); }
 .doc-block.dragging { opacity: .35; }
 .doc-block.drop-before { box-shadow: inset 0 3px 0 var(--accent); }
 .doc-block.drop-after  { box-shadow: inset 0 -3px 0 var(--accent); }
@@ -303,13 +317,23 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .st-menu .st-mod { flex: 0 0 auto; font: 11px var(--mono); color: var(--text3); }
 .st-menu button.cur { background: var(--sel); color: #fff; }
 .st-menu button.cur .st-mod { color: #cfe4f7; }
-.kind-item { border: none; border-radius: var(--r1); padding: 4px 10px; cursor: pointer;
-             color: #fff; font: 700 11px sans-serif; letter-spacing: .05em; text-align: left; }
-.kind-item:hover { filter: brightness(1.15); }
-.kind-item.headline { background: var(--k-headline); } .kind-item.vod { background: var(--k-vod); }
-.kind-item.vo { background: var(--k-vo); color: #241f00; } .kind-item.sync { background: var(--k-sync); }
-.kind-item.standup { background: var(--k-standup); } .kind-item.life { background: var(--k-life); }
-.kind-item.spiegel { background: var(--k-spiegel); }
+.kind-item {
+    display: flex; align-items: center; gap: 8px; border: 1px solid var(--line);
+    border-radius: 999px; padding: 4px 12px 4px 9px; cursor: pointer; text-align: left;
+    background: rgba(255,255,255,.04); color: var(--text);
+}
+.kind-item:hover { filter: brightness(1.2); }
+.kind-item .ki-code { font: 700 10px sans-serif; letter-spacing: .05em; text-transform: uppercase; }
+.kind-item .ki-ru { font-size: 11px; color: var(--text2); }
+/* те же tint-цвета, что у бейджей (solid-подложка больше не нужна) */
+.kind-item.headline { color: var(--kt-headline); border-color: rgba(47,124,207,.45); background: rgba(47,124,207,.14); }
+.kind-item.vod      { color: var(--kt-vod);      border-color: rgba(68,148,95,.45);  background: rgba(68,148,95,.14); }
+.kind-item.vo       { color: var(--kt-vo);       border-color: rgba(195,166,77,.45); background: rgba(195,166,77,.12); }
+.kind-item.sync     { color: var(--kt-sync);     border-color: rgba(223,88,79,.45);  background: rgba(223,88,79,.14); }
+.kind-item.standup  { color: var(--kt-standup);  border-color: rgba(148,113,223,.45); background: rgba(148,113,223,.14); }
+.kind-item.life     { color: var(--kt-life);     border-color: rgba(223,142,32,.45); background: rgba(223,142,32,.13); }
+.kind-item.spiegel  { color: var(--kt-spiegel);  border-color: rgba(154,93,67,.5);    background: rgba(154,93,67,.16); }
+.kind-menu { min-width: 220px; }
 
 .total-row {
     display: flex; align-items: center; margin-top: 8px; padding-top: 8px;
@@ -366,14 +390,7 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     border-bottom: 1px solid rgba(255,255,255,.08); font-size: 13px;
 }
 .mini-list .mi-item:hover { background: var(--hover); }
-.mini-list .mi-badge { flex: 0 0 auto; width: auto; min-width: 62px; }
-.badge.headline, .kind-headline { background: var(--k-headline); }
-.badge.vod { background: var(--k-vod); }
-.badge.vo { background: var(--k-vo); color: #241f00; }
-.badge.sync { background: var(--k-sync); }
-.badge.standup { background: var(--k-standup); }
-.badge.life { background: var(--k-life); }
-.badge.spiegel { background: var(--k-spiegel); }
+.mini-list .mi-badge { flex: 0 0 auto; width: auto; min-width: 84px; }
 .mini-list .mi-main { flex: 1; min-width: 0; }
 .mini-list .mi-main b { display: block; font-size: 12px; text-transform: uppercase; }
 .mini-list .mi-main span { display: block; font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

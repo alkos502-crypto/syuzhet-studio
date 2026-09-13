@@ -978,16 +978,44 @@ function updateMarks() {
 }
 
 /* ---------- блоки сценария ---------- */
-/* обложки-бейджи: внутренние ключи не меняем — только отображение (краткие русские метки) */
-const KIND_META = {
-    headline: { badge: "ЗАГ",   ru: "Заголовок" },
-    vod:      { badge: "ПОДВ",  ru: "Подводка"  },
-    vo:       { badge: "ЗК",    ru: "ЗК"        },
-    sync:     { badge: "СИНХ",  ru: "Синхрон"   },
-    standup:  { badge: "СТЕНД", ru: "Стендап"   },
-    life:     { badge: "ЛАЙФ",  ru: "Лайф"      },
-    spiegel:  { badge: "ШПИГ",  ru: "Шпигель"   }
+/* Реестр пиктограмм: stroke 2px, currentColor, viewBox 24 — единый язык с иконками транспорта.
+   Ключи видов совпадают с kind-ключами — b.kind попадает в icon() напрямую. */
+const ICONS = {
+    headline: '<path d="M5 6h14"/><path d="M12 6v13"/><path d="M9 19h6"/>',
+    vod:      '<path d="M4 12h11"/><path d="m11.5 7.5 4.5 4.5-4.5 4.5"/><path d="M20 5v14"/>',
+    vo:       '<path d="M11 5 6.5 8.8H4v6.4h2.5L11 19z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18.3 6.2a8.5 8.5 0 0 1 0 11.6"/>',
+    sync:     '<rect x="9.2" y="2.8" width="5.6" height="10.4" rx="2.8"/><path d="M12 13.2V21"/>',
+    standup:  '<circle cx="8.5" cy="5.6" r="2.6"/><path d="M4.4 20c.9-3.7 2.7-5.7 5-5.7 1.3 0 2.4.5 3.3 1.5"/><rect x="16" y="4.6" width="3.4" height="6.4" rx="1.7"/><path d="M17.7 13.4V16"/>',
+    life:     '<circle cx="12" cy="12" r="1.9"/><path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6"/><path d="M5.4 5.4a9.4 9.4 0 0 0 0 13.2M18.6 5.4a9.4 9.4 0 0 1 0 13.2"/>',
+    spiegel:  '<rect x="3.5" y="4" width="17" height="10" rx="1.5"/><path d="M7 8h10M7 10.8h6"/><path d="M7 18.4h10"/>',
+    gear:     '<circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/>',
+    bubble:   '<path d="M21 14.5a3 3 0 0 1-3 3H8l-5 4.2V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/>',
+    film:     '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M7.2 5v14M16.8 5v14M3 9.7h4.2M3 14.3h4.2M16.8 9.7H21M16.8 14.3H21"/>',
+    x:        '<path d="m6 6 12 12M18 6 6 18"/>',
+    chevD:    '<path d="m6 9.5 6 6 6-6"/>',
+    chevU:    '<path d="m6 14.5 6-6 6 6"/>',
+    chevL:    '<path d="m15 5.5-7 6.5 7 6.5"/>',
+    chevR:    '<path d="m9 5.5 7 6.5-7 6.5"/>',
+    fold:     '<path d="M20 4 15 9M15 9h-4M15 9v-4"/><path d="M4 20l5-5M9 15h4M9 15v4"/>',
+    pencil:   '<path d="m4.5 19.5 1.2-4.2L16.7 4.3a2 2 0 0 1 2.9 2.9L8.6 18.3z"/>',
 };
+function icon(name, size) {
+    return `<svg viewBox="0 0 24 24" width="${size || 13}" height="${size || 13}" fill="none" stroke="currentColor" ` +
+           `stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ""}</svg>`;
+}
+/* обложки-бейджи: внутренние ключи не меняем; метка — интернациональный код + пиктограмма */
+const KIND_META = {
+    headline: { badge: "HEADLINE", ru: "Заголовок" },
+    vod:      { badge: "LEAD",     ru: "Подводка"  },
+    vo:       { badge: "VO",       ru: "ЗК"        },
+    sync:     { badge: "SOT",      ru: "Синхрон"   },
+    standup:  { badge: "STANDUP",  ru: "Стендап"   },
+    life:     { badge: "LIFE",     ru: "Лайф"      },
+    spiegel:  { badge: "SPIEGEL",  ru: "Шпигель"   }
+};
+function badgeHtml(kind) {
+    return icon(kind) + `<span>${esc(KIND_META[kind].badge)}</span>`;
+}
 function newBlock(kind) {
     return {
         id: state.nextId++,
@@ -1023,7 +1051,7 @@ function showAddKindMenu(x, y) {
     Object.entries(KIND_META).forEach(([k, m]) => {
         const it = document.createElement("button");
         it.className = "kind-item " + k;
-        it.textContent = m.badge + " · " + m.ru;
+        it.innerHTML = `${icon(k, 14)}<span class="ki-code">${esc(m.badge)}</span><span class="ki-ru">${esc(m.ru)}</span>`;
         it.onmousedown = e => { e.stopPropagation(); menu.remove(); addAndFocus(k); };
         menu.appendChild(it);
     });
@@ -1416,7 +1444,7 @@ function renderBlocks() {
                ${b.parts.length ? " · " + b.parts.length + " фр." : ""}</span></div>` : "";
         const cN = SS_HOOK.commentCount(b.id);
         div.innerHTML = `
-            <button class="badge ${b.kind}" title="Клик — свернуть/развернуть; перетащить — изменить порядок">${esc(KIND_META[b.kind].badge)}</button>
+            <button class="badge ${b.kind}" title="Клик — свернуть/развернуть; перетащить — изменить порядок">${badgeHtml(b.kind)}</button>
             <div class="doc-main">
                 ${b.kind === "sync" ? `<div class="doc-speaker">
                     <input class="b-speaker" placeholder="Спикер — ФИО" title="Как в титрах: сначала имя, затем фамилия — так же разбиваются колонки MOGRT" value="${esc(b.speaker)}" aria-label="Спикер">
