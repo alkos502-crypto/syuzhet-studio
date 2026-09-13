@@ -291,7 +291,7 @@ function applyFolds() {
         if (!body || !btn) return;
         const folded = !!fs[sec.dataset.panel];
         body.hidden = folded;
-        btn.textContent = folded ? "▸" : "▾";
+        btn.innerHTML = icon(folded ? "chevR" : "chevD", 12);
         const name = sec.querySelector(".ph-title").textContent.trim();
         btn.setAttribute("aria-expanded", String(!folded));
         btn.setAttribute("aria-label", (folded ? "Развернуть панель: " : "Свернуть панель: ") + name);
@@ -360,7 +360,7 @@ function renderTotal() {
     const pl = $("ocTotalPlan");
     if (!pl) return;
     pl.hidden = false;
-    pl.textContent = st.targetSec > 0 ? "plan " + mmss(st.targetSec) : "set plan";
+    pl.innerHTML = (st.targetSec > 0 ? "plan " + mmss(st.targetSec) : "set plan") + " " + icon("pencil",11);
     pl.title = "Хронометраж-цель сюжета — клик, чтобы изменить (мм:сс)";
 }
 $("ocTotalPlan").onclick = async () => {
@@ -392,7 +392,7 @@ function renderCollab() {
     if (clBlockFilter !== null) items = items.filter(c => c.blockId === clBlockFilter);
     const host = $("ocCollabList");
     const chip = clBlockFilter !== null
-        ? `<div class="cl-filter">комментарии блока ${clBlockFilter} <button id="clFltX" aria-label="Снять фильтр">✕</button></div>` : "";
+        ? `<div class="cl-filter">комментарии блока ${clBlockFilter} <button id="clFltX" aria-label="Снять фильтр">${icon("x",11)}</button></div>` : "";
     if (!items.length) {
         host.innerHTML = chip + (clBlockFilter !== null
             ? '<div class="cl-empty">У этого блока нет записей.</div>'

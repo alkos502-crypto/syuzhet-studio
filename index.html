@@ -46,17 +46,17 @@
             <div class="nf-row">
                 <label>REP</label>
                 <select id="fioReporter" data-role="корреспондента" title="Корреспондент сюжета"></select>
-                <button class="nf-gear" data-names="fioReporter" title="Изменить и удалить имена" aria-label="Управление списками имён">⚙</button>
+                <button class="nf-gear" data-names="fioReporter" title="Изменить и удалить имена" aria-label="Управление списками имён"<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/></svg></button>
             </div>
             <div class="nf-row">
                 <label>CAM</label>
                 <select id="fioCam" data-role="оператора" title="Оператор сюжета"></select>
-                <button class="nf-gear" data-names="fioCam" title="Изменить и удалить имена" aria-label="Управление списками имён">⚙</button>
+                <button class="nf-gear" data-names="fioCam" title="Изменить и удалить имена" aria-label="Управление списками имён"<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/></svg></button>
             </div>
             <div class="nf-row">
                 <label>EDIT</label>
                 <select id="fioEditor" data-role="монтажёра" title="Монтажёр сюжета"></select>
-                <button class="nf-gear" data-names="fioEditor" title="Изменить и удалить имена" aria-label="Управление списками имён">⚙</button>
+                <button class="nf-gear" data-names="fioEditor" title="Изменить и удалить имена" aria-label="Управление списками имён"<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/></svg></button>
             </div>
             <div class="nf-row">
                 <label>FPS</label>
@@ -105,15 +105,15 @@
                 <button id="btnFind" class="ib" title="Поиск по тексту сюжета (Ctrl+F)">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                 </button>
-                <button id="btnFoldAll" class="ib" title="Свернуть / развернуть все блоки">⤡ все</button>
+                <button id="btnFoldAll" class="ib" title="Свернуть / развернуть все блоки"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 4 15 9M15 9h-4M15 9v-4"/><path d="M4 20l5-5M9 15h4M9 15v4"/></svg> All</button>
             </div>
             <div id="miniTl" class="mini-tl" hidden aria-label="Мини-таймлайн сюжета"></div>
             <div id="findBar" class="findbar" hidden>
                 <input id="findInput" type="search" placeholder="Search in story…  (Enter — next, Shift+Enter — back, Esc — close)" style="flex:1; min-width:0">
                 <span id="findCount" class="muted"></span>
-                <button id="findPrev" title="Предыдущее (Shift+Enter)">↑</button>
-                <button id="findNext" title="Следующее (Enter)">↓</button>
-                <button id="findClose" title="Закрыть (Esc)">✕</button>
+                <button id="findPrev" title="Previous (Shift+Enter)" aria-label="Previous"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 14.5 6-6 6 6"/></svg></button>
+                <button id="findNext" title="Next (Enter)" aria-label="Next"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9.5 6 6 6-6"/></svg></button>
+                <button id="findClose" title="Close (Esc)" aria-label="Close"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
             </div>
             <div id="blocks"></div>
         </div>
@@ -218,7 +218,7 @@
                         <button id="btnSetOut" class="mark out" title="Поставить Out (O)" aria-label="Поставить Out">Out }</button>
                         <span id="curBlock" class="cur-block" title="Блок-цель кнопки «В сценарий →» (кликните в блок, чтобы сменить)"></span>
                         <button id="btnSend" class="accent" title="Отправить фрагмент In→Out в текущий блок сценария">Send →</button>
-                        <button id="btnClearMarks" class="ti" title="Сбросить к краям файла" aria-label="Сбросить метки In/Out">✕</button>
+                        <button id="btnClearMarks" class="ti" title="Сбросить к краям файла" aria-label="Сбросить метки In/Out"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
                     </div>
                 </div>
             </div>
@@ -296,7 +296,7 @@
         <button id="ocTotalPlan" class="plan-btn" hidden>set plan</button>
     </div>
     <span class="vsep"></span>
-    <span id="sbSaved" class="sb-saved">✓</span>
+    <span id="sbSaved" class="sb-saved">—</span>
 </footer>
 
 <div id="toast"></div>
@@ -306,7 +306,7 @@
     <div class="modal-box">
         <div class="modal-head">
             <h2>Имена в списках</h2>
-            <button id="nmClose" class="icon-x" title="Закрыть (Esc)">✕</button>
+            <button id="nmClose" class="icon-x" title="Закрыть (Esc)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
         </div>
         <div class="nm-tabs" id="nmTabs"></div>
         <p class="muted" id="nmHint"></p>
@@ -323,7 +323,7 @@
     <div class="modal-box wm-box">
         <div class="modal-head">
             <h2>Правки из Word</h2>
-            <button id="wmClose" class="icon-x" title="Закрыть (Esc)">✕</button>
+            <button id="wmClose" class="icon-x" title="Закрыть (Esc)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
         </div>
         <p class="muted" id="wmSummary"></p>
         <div class="wm-toolbar">
@@ -342,7 +342,7 @@
     <div class="modal-box ask-box">
         <div class="modal-head">
             <h2 id="askTitle"></h2>
-            <button id="askX" class="icon-x" title="Отмена (Esc)" aria-label="Закрыть">✕</button>
+            <button id="askX" class="icon-x" title="Отмена (Esc)" aria-label="Закрыть"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
         </div>
         <p class="muted" id="askMsg" hidden></p>
         <input id="askInput" autocomplete="off">
@@ -369,7 +369,7 @@
     <div class="modal-box keys-box">
         <div class="modal-head">
             <h2>Горячие клавиши</h2>
-            <button id="kmClose" class="icon-x" title="Закрыть (Esc)" aria-label="Закрыть">✕</button>
+            <button id="kmClose" class="icon-x" title="Закрыть (Esc)" aria-label="Закрыть"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
         </div>
         <div class="keys-cols">
             <section>

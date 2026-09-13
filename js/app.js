@@ -306,7 +306,7 @@ function renderNm() {
             <input value="${esc(n)}">
             <span class="nm-badge ${isShared ? "sh" : "loc"}" title="${isShared ? "На сервере, видят все" : "Только в этом браузере"}">${isShared ? "общее" : "локальное"}</span>
             <button data-nm="rename" title="Переименовать в введённое">✎</button>
-            <button data-nm="del" title="Удалить">✕</button>`;
+            <button data-nm="del" title="Удалить" aria-label="Удалить имя">${icon("x",12)}</button>`;
         const inp = row.querySelector("input");
         inp.addEventListener("keydown", e => { if (e.key === "Enter") inp.blur(), row.querySelector('[data-nm=rename]').click(); });
         row.querySelector('[data-nm=rename]').onclick = () => nmRename(id, n, inp.value.trim());
@@ -1456,10 +1456,10 @@ function renderBlocks() {
             </div>
             <span class="doc-dur" title="${est ? "Оценка по длине текста (~" + Math.round(readCps()) + " зн/с, темп задаётся в шапке сюжета)" : "Сумма таймкодов фрагментов"}">${est ? "~" : ""}${durTc(dur)}</span>
             <div class="doc-tools">
-                ${cN ? `<button data-act="cmts" title="${cN} комм. к блоку">💬${cN}</button>` : ""}
+                ${cN ? `<button data-act="cmts" title="${cN} комм. к блоку" aria-label="Комментарии блока">${icon("bubble",12)}${cN}</button>` : ""}
                 ${PART_KINDS.has(b.kind) ? `
-                <button data-act="parts" class="doc-parts-toggle${b.partsFolded ? " folded" : ""}" title="Свернуть / развернуть присоединённые фрагменты">🎞${b.parts.length || ""} ${b.partsFolded ? "▸" : "▾"}</button>` : ""}
-                <button data-act="del" title="Удалить" aria-label="Удалить блок">✕</button>
+                <button data-act="parts" class="doc-parts-toggle${b.partsFolded ? " folded" : ""}" title="Свернуть / развернуть присоединённые фрагменты">${icon("film",12)}${b.parts.length || ""}${icon(b.partsFolded ? "chevR" : "chevD",11)}</button>` : ""}
+                <button data-act="del" title="Удалить" aria-label="Удалить блок">${icon("x",12)}</button>
             </div>
         `;
 
@@ -1473,7 +1473,7 @@ function renderBlocks() {
                 <span class="tc">${tc(p.in)} → ${tc(p.out)}</span>
                 <span class="tc">${durHuman(p.out - p.in)}</span>
                 <button data-act="goto" title="Открыть в плеере" aria-label="Открыть фрагмент в плеере">▶</button>
-                <button data-act="del-part" title="Убрать фрагмент" aria-label="Убрать фрагмент">✕</button>
+                <button data-act="del-part" title="Убрать фрагмент" aria-label="Убрать фрагмент">${icon("x",11)}</button>
             `;
             pe.querySelector("[data-act=del-part]").onclick = () => { histBefore(); b.parts.splice(pi, 1); renderBlocks(); saveState(); };
             pe.querySelector("[data-act=goto]").onclick = () => {

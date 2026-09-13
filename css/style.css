@@ -49,6 +49,10 @@ button.accent:hover { background: var(--accent-h); border-color: var(--accent-h)
 button.mark { background: var(--mark); border-color: var(--mark); color: var(--accent-2); }
 button.mark:hover { background: var(--mark-h); border-color: var(--mark-h); }
 button:disabled { opacity: .4; cursor: default; }
+button svg { display: block; flex: 0 0 auto; }
+.doc-tools button, .nf-gear, .icon-x, .findbar button, .ph-fold, .plan-btn, #btnSend, #nmAddBtn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+}
 input, select, textarea {
     background: var(--input-bg); color: var(--text); border: 1px solid var(--line);
     border-radius: var(--r1); padding: 4px 8px; font: inherit; width: 100%;
