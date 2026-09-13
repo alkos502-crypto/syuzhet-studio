@@ -142,6 +142,7 @@ function ocFlushNow() {
     st.req = store.get("ss_req", {});
     st.modified = nowHM();
     persistStories();
+    sbSaved(st.modified);
 }
 function ocFlushSoon() { clearTimeout(ocFlushT); ocFlushT = setTimeout(ocFlushNow, 400); }
 
@@ -222,8 +223,20 @@ function renderHead() {
     const st = active();
     $("ocStoryId").textContent = String(st.id).padStart(8, "0");
     $("ocModified").textContent = st.modified || "—";
+    $("sbFps").textContent = $("fpsInput").value || "—";
+    sbSaved(st.modified);
 }
-$("storyTitle").addEventListener("input", () => { ocFlushSoon(); });
+/* ---------- статус-бар: сохранение / FPS ---------- */
+function sbDirty() {
+    const e = $("sbSaved");
+    if (e) { e.textContent = "…изменения"; e.classList.add("dirty"); }
+}
+function sbSaved(time) {
+    const e = $("sbSaved");
+    if (e) { e.textContent = "✓ " + (time || nowHM()) + " сохранено"; e.classList.remove("dirty"); }
+}
+$("fpsInput").addEventListener("input", () => { $("sbFps").textContent = $("fpsInput").value || "—"; });
+$("storyTitle").addEventListener("input", () => { sbDirty(); ocFlushSoon(); });
 $("storyTitle").addEventListener("change", () => { ocFlushNow(); renderHead(); });
 
 /* ---------- вкладки центра ---------- */
@@ -281,7 +294,37 @@ document.querySelectorAll(".ph-fold").forEach(b => b.onclick = () => {
     const fs = foldState();
     fs[sec.dataset.panel] = !fs[sec.dataset.panel];
     try { localStorage.setItem("ss_fold", JSON.stringify(fs)); } catch (e) {}
-    applyFolds();
+applyFolds();
+
+/* ---------- сплиттер центр↔право: ширина правой колонки в ss_rcw ---------- */
+(function () {
+    const sp = $("vsplit"), rc = $("rightcol");
+    if (!sp || !rc) return;
+    function setW(px) {
+        px = Math.max(400, Math.min(Math.round(window.innerWidth * .7), Math.round(px)));
+        rc.style.flex = "0 0 " + px + "px";
+        try { localStorage.setItem("ss_rcw", String(px)); } catch (e) {}
+    }
+    const saved = parseInt(localStorage.getItem("ss_rcw") || "", 10);
+    if (saved > 300) setW(saved);
+    sp.addEventListener("mousedown", e => {
+        e.preventDefault();
+        const x0 = e.clientX, w0 = rc.getBoundingClientRect().width;
+        sp.classList.add("drag");
+        const mv = ev => setW(w0 + (x0 - ev.clientX));
+        const up = () => {
+            document.removeEventListener("mousemove", mv);
+            document.removeEventListener("mouseup", up);
+            sp.classList.remove("drag");
+        };
+        document.addEventListener("mousemove", mv);
+        document.addEventListener("mouseup", up);
+    });
+    sp.addEventListener("dblclick", () => {
+        rc.style.flex = "";
+        try { localStorage.removeItem("ss_rcw"); } catch (e) {}
+    });
+})();
 });
 /* активная панель — рамка-подсветка шапки, как в Premiere */
 document.addEventListener("pointerdown", e => {
@@ -521,7 +564,7 @@ function ocRefreshAll() {
 
 /* ---------- точки расширения движка (app.js) — без переназначения его функций ---------- */
 SS_HOOK.afterRender = ocRefreshAll;
-SS_HOOK.afterSave = ocFlushSoon;
+SS_HOOK.afterSave = () => { sbDirty(); ocFlushSoon(); };
 SS_HOOK.afterVideoList = () => { $("ocVidCount").textContent = videoFiles.length; };
 SS_HOOK.beforeSearch = () => { if ($("view-script").hidden) switchCenterTab("script"); };
 const TIME_RE = /^\d{1,2}[:.]\d{2}$/;

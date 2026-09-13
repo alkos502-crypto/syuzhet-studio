@@ -14,9 +14,6 @@
     <nav class="gnav">
         <button class="gn" id="gnProject">Проект</button>
         <button class="gn active" id="gnStory">Сюжет</button>
-        <button class="gn">Ресурсы</button>
-        <button class="gn">Планирование</button>
-        <button class="gn">Система</button>
     </nav>
     <span class="spacer"></span>
     <button class="ib" id="ocBell" title="Уведомления">
@@ -72,7 +69,6 @@
                      title="Темп чтеца, зн/мин — для оценки хронометража текстовых блоков (ЗАГ, ПОДВ, ЗК) без фрагментов. 540 ≈ телеграфный темп">
             </div>
             <span class="spacer"></span>
-            <span class="sh-id">ИД <b id="ocStoryId">—</b> · изм. <b id="ocModified">—</b></span>
             <div class="sh-actions">
                 <input type="file" id="draftFile" accept=".json" hidden>
                 <input type="file" id="wordFile" accept=".doc,.docx,.htm,.html,.txt" hidden>
@@ -121,10 +117,6 @@
                 <button id="findClose" title="Закрыть (Esc)">✕</button>
             </div>
             <div id="blocks"></div>
-            <div class="total-row">
-                <span>ИТОГО</span><b id="ocTotal">00:00</b>
-                <button id="ocTotalPlan" class="plan-btn" hidden>план ✎</button>
-            </div>
         </div>
 
         <!-- ------------------ SUMMARY ------------------ -->
@@ -175,6 +167,8 @@
         </div>
     </div>
 </main>
+
+<div id="vsplit" role="separator" aria-orientation="vertical" title="Тянуть — ширина правой колонки; двойной клик — сброс"></div>
 
 <!-- ============================ RIGHT: MEDIA / SOTs / GRAPHICS / APPROVAL ============================ -->
 <aside id="rightcol">
@@ -292,6 +286,19 @@
 </aside>
 
 </div><!-- /#workspace -->
+
+<footer id="statusbar">
+    <span class="sb-id">ИД <b id="ocStoryId">—</b> · изм. <b id="ocModified">—</b></span>
+    <span class="vsep"></span>
+    <span class="sb-id">FPS <b id="sbFps">25</b></span>
+    <span class="spacer"></span>
+    <div class="total-row">
+        <span>ИТОГО</span><b id="ocTotal">00:00</b>
+        <button id="ocTotalPlan" class="plan-btn" hidden>план ✎</button>
+    </div>
+    <span class="vsep"></span>
+    <span id="sbSaved" class="sb-saved">✓</span>
+</footer>
 
 <div id="toast"></div>
 
