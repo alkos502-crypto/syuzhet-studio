@@ -3,6 +3,10 @@
 
 Запуск: python3 server.py [порт] [--open]
   --open — открыть страницу в браузере автоматически (для Windows-версии)
+Переменная окружения SS_VERBOSE=1 — подробный лог каждого запроса.
+
+names.json содержит служебное поле "_v" (версия): POST без актуальной версии
+получает 409 — так два пользователя не затирают правки друг друга молча.
 """
 import json
 import os
@@ -21,6 +25,7 @@ NAMES_FILE = os.path.join(ROOT, "names.json")
 ROLES = ("fioReporter", "fioCam", "fioEditor")
 MAX_PER_ROLE = 200
 MAX_BODY = 64 * 1024
+VKEY = "_v"
 
 
 def clean_lists(payload):
@@ -45,53 +50,128 @@ def clean_lists(payload):
     return out
 
 
+def read_names():
+    """Текущие списки и их версия (у файла без _v считаем версию 0)."""
+    try:
+        with open(NAMES_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return {r: [] for r in ROLES}, 0
+    except Exception:
+        raise ValueError("names.json повреждён — почините его или удалите (есть names.json.bak)")
+    if not isinstance(data, dict):
+        raise ValueError("names.json должен содержать JSON-объект")
+    ver = data.get(VKEY) if isinstance(data.get(VKEY), int) else 0
+    return clean_lists(data), ver
+
+
 class Handler(SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"   # keep-alive; все ответы с Content-Length
 
     @staticmethod
     def _forbidden(path):
         parts = [p for p in path.replace("\\", "/").split("/") if p]
-        return any(p == ".git" or p.startswith(".") or p.endswith(".bak") for p in parts)
+        return any(p == ".git" or p == "__pycache__" or p.startswith(".")
+                   or p.endswith((".bak", ".tmp")) for p in parts)
 
+    def log_message(self, fmt, *a):
+        if os.environ.get("SS_VERBOSE"):
+            super().log_message(fmt, *a)
+
+    # ---------- отправка ----------
+    def _send(self, code, ctype, body, extra=None):
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _json(self, code, obj, extra=None):
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self._send(code, "application/json; charset=utf-8", body, extra)
+
+    # ---------- GET ----------
     def do_GET(self):
-        if self._forbidden(self.path.split("?", 1)[0]):
+        path = self.path.split("?", 1)[0]
+        if self._forbidden(path):
             return self._json(403, {"error": "доступ запрещён"})
+        if path in ("/names.json", "names.json"):
+            return self._serve_names()
         return super().do_GET()
+
+    def _serve_names(self):
+        try:
+            names, ver = read_names()
+        except Exception as e:
+            return self._json(500, {"error": str(e)})
+        names[VKEY] = ver
+        etag = '"v%d"' % ver
+        if self.headers.get("If-None-Match") == etag:
+            self.send_response(304)
+            self.send_header("ETag", etag)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+        body = json.dumps(names, ensure_ascii=False, indent=2).encode("utf-8")
+        self._send(200, "application/json; charset=utf-8", body,
+                   {"Cache-Control": "no-store", "ETag": etag})
+
+    # ---------- POST ----------
+    def _read_body(self):
+        """Всегда дочитывает тело (иначе keep-alive «поплывёт»).
+        Возвращает (body, None) или (None, (code, obj))."""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0 or length > MAX_BODY:
+            self.close_connection = True
+            return None, (400, {"error": "некорректный размер запроса"})
+        return (self.rfile.read(length) if length else b""), None
 
     def do_POST(self):
         path = self.path.split("?", 1)[0].lstrip("/")
+        body, err = self._read_body()
+        if err:
+            return self._json(*err)
         if path != "names.json":
             return self._json(405, {"error": "этот адрес не доступен для записи"})
+        # защита от межсайтовых запросов: нет preflight — нет записи из чужой страницы
+        ctype = (self.headers.get("Content-Type") or "").lower()
+        if "application/json" not in ctype or not self.headers.get("X-Requested-With"):
+            return self._json(415, {"error": "запись только из интерфейса Сюжет-Студии"})
         try:
-            length = int(self.headers.get("Content-Length") or 0)
-            if length <= 0 or length > MAX_BODY:
-                raise ValueError("некорректный размер запроса")
-            data = json.loads(self.rfile.read(length).decode("utf-8"))
+            data = json.loads(body.decode("utf-8"))
+            client_v = data.get(VKEY) if isinstance(data, dict) else None
             clean = clean_lists(data)
         except Exception as e:
             return self._json(400, {"error": str(e)})
+        try:
+            _, cur_v = read_names()
+        except Exception as e:
+            return self._json(500, {"error": str(e)})
+        if isinstance(client_v, int) and client_v != cur_v:
+            return self._json(409, {"error": "список имён изменён другим пользователем — обновите страницу (F5) и повторите",
+                                    "conflict": True, VKEY: cur_v})
+        out = dict(clean)
+        out[VKEY] = cur_v + 1
         try:
             if os.path.exists(NAMES_FILE):
                 shutil.copy2(NAMES_FILE, NAMES_FILE + ".bak")
             fd, tmp = tempfile.mkstemp(dir=ROOT, suffix=".names.tmp")
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    f.write(json.dumps(clean, ensure_ascii=False, indent=2) + "\n")
+                    f.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
                 os.replace(tmp, NAMES_FILE)
             finally:
                 if os.path.exists(tmp):
                     os.unlink(tmp)
         except Exception as e:
             return self._json(500, {"error": "запись не удалась: %s" % e})
-        self._json(200, {"ok": True})
-
-    def _json(self, code, obj):
-        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(body)
+        self._json(200, {"ok": True, VKEY: cur_v + 1})
 
 
 def lan_ip():

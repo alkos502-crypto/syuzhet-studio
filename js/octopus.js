@@ -1,4 +1,4 @@
-/* OCTOPUS — оболочка newsroom-интерфейса поверх движка Сюжет-Студии */
+/* МЕДИАЦЕНТР — оболочка newsroom-интерфейса поверх движка Сюжет-Студии */
 "use strict";
 
 /* ---------- модель данных сюжетов ---------- */
@@ -8,16 +8,16 @@ const OC = {
     activeId: null,
     nextNum: 12600
 };
+window.OC = OC;    /* const не попадает в window сам — нужно для диагностики/дампа */
 
 const nowHM = () => new Date().toTimeString().slice(0, 5);
 const dateHM = () => {
     const d = new Date();
     return String(d.getDate()).padStart(2, "0") + "." + String(d.getMonth() + 1).padStart(2, "0") + " " + nowHM();
 };
-const statusLabel = s => s === "ON AIR" ? "COMPLETED" : s;
-const statusCls = s => s === "ASSIGNED" ? "s-assigned" : s === "ON AIR" ? "s-done" : s === "READY" ? "s-ready" : s === "APPROVED" ? "s-approved" : "s-prog";
-const badgeCls  = s => ({ "ASSIGNED": "st-assigned", "IN PROGRESS": "st-edit", "READY": "st-ready", "APPROVED": "st-approved", "ON AIR": "st-air" })[s] || "";
-const badgeText = s => s === "IN PROGRESS" ? "EDITING" : statusLabel(s);
+/* Отображение этапов по-русски; внутренние значения (stage, ключи stageDates)
+   остаются английскими — не трогаем сохранённые данные. Этап больше не показывается
+   в интерфейсе, но сохраняется в сюжете и черновиках ради совместимости. */
 const mmss = sec => (sec ? durTc(sec) : "00:00");
 
 function mkBlock(id, kind, text, speaker) {
@@ -82,7 +82,37 @@ function seedStories() {
     return list;
 }
 
-function persistStories() { store.set("oc_stories", OC.stories); store.set("oc_active", OC.activeId); }
+/* ---------- хранение сюжетов: IndexedDB (localStorage ~5 МБ забивается быстро) ----------
+   SS_IDB_OK ставит ocInit; при его отсутствии — тихий возврат к localStorage.
+   Записи в IDB идут последовательно (цепочка промисов), данные всегда полный снимок.
+   До конца ocInit (проба IDB) записи буферизуются — иначе гонка напишет мегабайты
+   в localStorage, который миграция как раз собирается освободить. */
+window.SS_IDB_OK = false;
+let ocInitDone = false, ocPersistPending = false;
+let idbWriteChain = Promise.resolve();
+function persistStories() {
+    if (!ocInitDone) { ocPersistPending = true; return; }
+    if (window.SS_IDB_OK) {
+        idbWriteChain = idbWriteChain
+            .then(() => IDB.put("kv", "oc_stories", OC.stories))
+            .then(() => IDB.put("kv", "oc_active", OC.activeId))
+            .catch(e => {
+                console.error("IDB stories save failed:", e);
+                window.SS_IDB_OK = false;            /* дальше — через localStorage, как раньше */
+                quotaWarn("IndexedDB: " + ((e && e.name) || e));
+                persistStories();
+            });
+    } else {
+        store.set("oc_stories", OC.stories);
+        store.set("oc_active", OC.activeId);
+    }
+}
+function clearHeavyLsKeys() {
+    window.SS_LS_MIGRATED = true;                  /* saveState больше не плодит легаси-дубли */
+    ["oc_stories", "oc_active", "ss_blocks", "ss_nextId"].forEach(k => {
+        try { localStorage.removeItem(k); } catch (e) {}
+    });
+}
 function active() { return OC.stories.find(s => s.id === OC.activeId) || OC.stories[0]; }
 
 /* ---------- переключение / сохранение активного сюжета ---------- */
@@ -115,79 +145,86 @@ function ocFlushNow() {
 }
 function ocFlushSoon() { clearTimeout(ocFlushT); ocFlushT = setTimeout(ocFlushNow, 400); }
 
-/* ---------- левая колонка: MY ASSIGNMENTS ---------- */
-function renderAssignments() {
-    const host = $("ocAsList");
-    const filt = $("ocAsFilter").value;
-    const q = (($("ocAsSearch").value || "") + " " + ($("ocGlobalSearch").value || "")).trim().toLowerCase();
-    let html = "", shown = 0;
-    [[0, "Today"], [1, "Tomorrow"]].forEach(([day, label]) => {
-        const items = OC.stories.filter(s => s.day === day)
-            .filter(s => filt === "all" || s.stage === filt)
-            .filter(s => !q || s.title.toLowerCase().includes(q));
-        if (!items.length) return;
-        html += `<div class="as-date">${label}</div>`;
-        items.forEach(s => {
-            shown++;
-            html += `<div class="as-item${s.id === OC.activeId ? " active" : ""}" data-oc="${s.id}" title="${esc(s.title)}">
-                <span class="as-title">${esc(s.title)}</span>
-                <span class="as-st ${statusCls(s.stage)}">${statusLabel(s.stage)}</span>
-                <span class="as-time">${s.time}</span></div>`;
-        });
+/* ---------- управление сюжетами (из меню «Проект») ---------- */
+function deleteStory(id) {
+    const st = OC.stories.find(s => s.id === (id || OC.activeId));
+    if (!st) return;
+    confirm2("Удалить сюжет", "«" + st.title + "» и его черновик будут удалены в этом браузере.").then(ok => {
+        if (!ok) return;
+        const i = OC.stories.indexOf(st);
+        OC.stories.splice(i, 1);
+        if (!OC.stories.length) OC.stories.push(newStory({ title: "Новый сюжет" }));
+        const nxt = OC.stories[Math.min(i, OC.stories.length - 1)];
+        OC.activeId = nxt.id;                 /* чтобы редактор не «дописался» в чужой сюжет */
+        loadStory(nxt.id);
+        persistStories(); renderHead();
+        toast("Сюжет удалён", "ok");
     });
-    host.innerHTML = shown ? html : '<div class="cl-empty">Ничего не найдено</div>';
-    host.querySelectorAll("[data-oc]").forEach(el =>
-        el.onclick = () => { const id = +el.dataset.oc; if (id !== OC.activeId) { loadStory(id); toast("Открыт сюжет: " + active().title); } });
 }
-$("ocAsFilter").addEventListener("change", renderAssignments);
-$("ocAsSearch").addEventListener("input", renderAssignments);
-$("ocGlobalSearch").addEventListener("input", renderAssignments);
+function duplicateStory(id) {
+    ocFlushNow();
+    const src = OC.stories.find(s => s.id === (id || OC.activeId));
+    if (!src) return;
+    const c = JSON.parse(JSON.stringify(src));
+    c.id = OC.nextNum++;
+    c.title = (src.title + " (копия)").slice(0, 80);
+    c.modified = nowHM();
+    OC.stories.splice(OC.stories.indexOf(src) + 1, 0, c);
+    loadStory(c.id);
+    toast("Копия «" + c.title + "» создана", "ok");
+}
 
-function newStoryDialog() {
-    const t = (prompt("Название нового сюжета:") || "").trim();
+async function newStoryDialog() {
+    const t = ((await ask("Новый сюжет", { placeholder: "Название сюжета", ok: "Создать" })) || "").trim();
     if (!t) return;
     ocFlushNow();
     const st = newStory({ title: t });
     OC.stories.unshift(st);
     loadStory(st.id);
-    renderAssignments();
     toast("Сюжет создан — назначьте исходники и печатайте сценарий", "ok");
 }
 
-/* ---------- левая колонка: NEWSWIRE ---------- */
-const WIRE = [
-    { time: "15:05", ag: "Правительство", text: "Правительство утвердило новый план развития транспортной инфраструктуры" },
-    { time: "14:58", ag: "ЦБ", text: "Центробанк снизил ключевую ставку на 0,25%" },
-    { time: "14:45", ag: "МЧС", text: "Пожар в торговом центре локализован" },
-    { time: "14:32", ag: "Спорт", text: "Сборная России вышла в финал чемпионата мира" },
-    { time: "14:20", ag: "Общество", text: "В город приехала делегация из Китая" },
-    { time: "14:10", ag: "Общество", text: "Погода на выходные: без осадков" },
-    { time: "14:02", ag: "ЦБ", text: "Рост цен на бензин замедлился" }
-];
-function renderWire() {
-    const ag = $("ocWireFilter").value, q = $("ocWireSearch").value.trim().toLowerCase();
-    $("ocWire").innerHTML = WIRE
-        .filter(n => ag === "all" || n.ag === ag)
-        .filter(n => !q || n.text.toLowerCase().includes(q))
-        .map(n => `<div class="wire-item"><span class="wire-time">${n.time}</span>
-            <span class="wire-text">${esc(n.text)}<span class="wire-ag">${esc(n.ag)}</span></span></div>`).join("")
-        || '<div class="cl-empty">Нет новостей по фильтру</div>';
+/* список сюжетов: меню «Проект» → «Сюжеты…» (переключение/дублирование/удаление) */
+function closeStoriesMenu() { const m = $("storiesMenu"); if (m) m.remove(); }
+function showStoriesMenu(anchor) {
+    if ($("storiesMenu")) { closeStoriesMenu(); return; }
+    closeProjMenu();
+    ocFlushNow();
+    const m = document.createElement("div");
+    m.id = "storiesMenu"; m.className = "proj-menu st-menu";
+    m.innerHTML = OC.stories.map(s => `
+        <button data-st-id="${s.id}" class="${s.id === OC.activeId ? "cur" : ""}">
+            <span class="st-name">${s.id === OC.activeId ? "✓ " : ""}${esc(s.title || "Без названия")}</span>
+            <span class="st-mod">${esc(s.modified || "")}</span>
+        </button>`).join("") +
+        '<div class="pj-sep"></div><button data-st-menu="dup">⧉ Дублировать текущий</button>' +
+        '<button data-st-menu="del">🗑 Удалить текущий</button>';
+    document.body.appendChild(m);
+    const r = anchor.getBoundingClientRect();
+    m.style.left = Math.min(r.left, window.innerWidth - m.offsetWidth - 8) + "px";
+    m.style.top = (r.bottom + 4) + "px";
+    m.querySelectorAll("[data-st-id]").forEach(b => b.onclick = () => {
+        const id = +b.dataset.stId;
+        m.remove();
+        if (id === OC.activeId) return;
+        loadStory(id);
+        toast("Открыт сюжет: " + active().title);
+    });
+    m.querySelector('[data-st-menu=dup]').onclick = () => { m.remove(); duplicateStory(); };
+    m.querySelector('[data-st-menu=del]').onclick = () => { m.remove(); deleteStory(); };
+    setTimeout(() => document.addEventListener("mousedown", function h(e2) {
+        if (!m.contains(e2.target)) { m.remove(); document.removeEventListener("mousedown", h); }
+    }), 0);
 }
-$("ocWireFilter").addEventListener("change", renderWire);
-$("ocWireSearch").addEventListener("input", renderWire);
 
 /* ---------- шапка сюжета ---------- */
 function renderHead() {
     const st = active();
-    const b = $("ocStatusBadge");
-    b.textContent = badgeText(st.stage);
-    b.className = "sb " + badgeCls(st.stage);
     $("ocStoryId").textContent = String(st.id).padStart(8, "0");
-    $("ocStorySlug").textContent = (st.title || "—").toLowerCase().replace(/\s+/g, "-");
     $("ocModified").textContent = st.modified || "—";
 }
 $("storyTitle").addEventListener("input", () => { ocFlushSoon(); });
-$("storyTitle").addEventListener("change", () => { ocFlushNow(); renderAssignments(); });
+$("storyTitle").addEventListener("change", () => { ocFlushNow(); renderHead(); });
 
 /* ---------- вкладки центра ---------- */
 let centerTab = "script";
@@ -195,8 +232,6 @@ function switchCenterTab(name) {
     centerTab = name;
     document.querySelectorAll("#ocTabs .tab").forEach(t => t.classList.toggle("active", t.dataset.view === name));
     document.querySelectorAll(".cview").forEach(v => v.hidden = v.id !== "view-" + name);
-    $("gnMetadata").classList.toggle("active", name === "metadata");
-    $("gnStory").classList.toggle("active", name !== "metadata");
     if (name === "summary") renderSummary();
     if (name === "sources") renderSources();
     if (name === "social") renderSocial();
@@ -217,25 +252,41 @@ function switchMediaTab(name) {
 document.querySelectorAll("#ocMediaTabs .tab").forEach(t =>
     t.onclick = () => switchMediaTab(t.dataset.mv));
 
-/* ---------- TOTAL (хронометраж сценария) ---------- */
+/* ---------- TOTAL (хронометраж + план из targetSec) ---------- */
+function mmssToSec(s) {
+    s = String(s).replace(",", ".").trim();
+    if (/^\d+(\.\d+)?$/.test(s)) return +s;
+    const p = s.split(":");
+    if (p.length === 2 && /^\d+$/.test(p[0]) && /^\d{1,2}$/.test(p[1])) return (+p[0]) * 60 + (+p[1]);
+    return NaN;
+}
 function renderTotal() {
-    $("ocTotal").textContent = mmss(state.blocks.reduce((s, b) => s + blockDur(b), 0));
-}
-
-/* ---------- workflow: перевод сюжета на следующий этап (панель APPROVAL) ---------- */
-function advanceStage() {
+    const total = state.blocks.reduce((s, b) => s + blockDur(b), 0);
     const st = active();
-    const i = OC.STAGES.indexOf(st.stage);
-    if (i >= OC.STAGES.length - 1) return toast("Сюжет уже в эфире", "warn");
-    st.stage = OC.STAGES[i + 1];
-    (st.stageDates = st.stageDates || {})[st.stage] = dateHM();
-    ocFlushNow(); renderHead(); renderAssignments();
-    if (mediaTab === "approval") renderApproval();
-    toast("Этап: " + st.stage, "ok");
+    const tEl = $("ocTotal");
+    tEl.textContent = mmss(total);
+    tEl.classList.toggle("over", st.targetSec > 0 && total > st.targetSec);
+    const pl = $("ocTotalPlan");
+    if (!pl) return;
+    pl.hidden = false;
+    pl.textContent = (st.targetSec > 0 ? "план " + mmss(st.targetSec) : "задать план") + " ✎";
+    pl.title = "Хронометраж-цель сюжета — клик, чтобы изменить (мм:сс)";
 }
+$("ocTotalPlan").onclick = async () => {
+    const st = active();
+    const v = await ask("Хронометраж-план", { value: st.targetSec > 0 ? mmss(st.targetSec) : "",
+                                              placeholder: "мм:сс или секунд", ok: "Задать" });
+    if (v === null) return;
+    const s = mmssToSec(v);
+    if (!(s > 0 && s < 36000)) return toast("Не понял длительность — ждём «мм:сс»", "err");
+    st.targetSec = Math.round(s);
+    ocFlushNow(); renderTotal();
+    toast("План: " + mmss(st.targetSec), "ok");
+};
 
-/* ---------- COLLABORATION (comments / suggestions / tasks) ---------- */
+/* ---------- COLLABORATION (comments / suggestions / tasks, якоря к блокам) ---------- */
 let clTab = "comment";
+let clBlockFilter = null;          /* показывать только комментарии блока N */
 const CL_LABEL = { comment: "комментариев", suggestion: "предложений", task: "задач" };
 function renderCollab() {
     const st = active();
@@ -243,19 +294,33 @@ function renderCollab() {
     ["comment", "suggestion", "task"].forEach(k =>
         $("clCount-" + k).textContent = st.comments.filter(c => c.kind === k).length);
     document.querySelectorAll(".cl-tabs .tab").forEach(t => t.classList.toggle("active", t.dataset.cl === clTab));
-    const items = st.comments.filter(c => c.kind === clTab);
+    let items = st.comments.filter(c => c.kind === clTab);
+    if (clBlockFilter !== null) items = items.filter(c => c.blockId === clBlockFilter);
     const host = $("ocCollabList");
-    if (!items.length) { host.innerHTML = `<div class="cl-empty">Нет ${CL_LABEL[clTab]}ов — напишите первым.</div>`; return; }
-    host.innerHTML = items.map((c, ci) =>
-        `<div class="cl-item${c.done ? " done" : ""}">
+    const chip = clBlockFilter !== null
+        ? `<div class="cl-filter">комментарии блока ${clBlockFilter} <button id="clFltX" aria-label="Снять фильтр">✕</button></div>` : "";
+    if (!items.length) {
+        host.innerHTML = chip + (clBlockFilter !== null
+            ? '<div class="cl-empty">У этого блока нет записей.</div>'
+            : `<div class="cl-empty">Нет ${CL_LABEL[clTab]}ов — напишите первым.</div>`);
+        const x = $("clFltX"); if (x) x.onclick = () => { clBlockFilter = null; renderCollab(); };
+        return;
+    }
+    host.innerHTML = chip + items.map((c, ci) =>
+        `<div class="cl-item${c.done ? " done" : ""}${c.blockId ? " anchored" : ""}">
             ${c.kind === "task" ? `<input type="checkbox" class="cl-check" data-ci="${ci}" ${c.done ? "checked" : ""}>` : ""}
             <span class="cl-who">${esc(c.who)}</span>
             <span class="cl-body">${esc(c.text)}</span>
-            <span class="cl-time">${c.time}</span></div>`).join("");
+            ${c.blockId ? `<button class="cl-jump" data-ci="${ci}" title="Перейти к блоку">→</button>` : ""}
+            <span class="cl-time">${esc(String(c.time || ""))}</span></div>`).join("");
     host.querySelectorAll(".cl-check").forEach(ch => ch.onchange = () => {
-        const arr = st.comments.filter(c => c.kind === clTab);
-        arr[+ch.dataset.ci].done = ch.checked; ocFlushNow(); renderCollab();
+        items[+ch.dataset.ci].done = ch.checked; ocFlushNow(); renderCollab();
     });
+    host.querySelectorAll(".cl-jump").forEach(j => j.onclick = () => {
+        const c = items[+j.dataset.ci];
+        gotoBlock(c.blockId);
+    });
+    const x = $("clFltX"); if (x) x.onclick = () => { clBlockFilter = null; renderCollab(); };
 }
 document.querySelectorAll(".cl-tabs .tab").forEach(t =>
     t.onclick = () => { clTab = t.dataset.cl; renderCollab(); });
@@ -263,9 +328,21 @@ function postCollab() {
     const inp = $("ocCommentText"), v = inp.value.trim();
     if (!v) return;
     const st = active();
-    (st.comments = st.comments || []).push({ kind: clTab, who: resolveNameValue("fioReporter") || "Иван Петров", text: v, time: nowHM(), done: false });
-    inp.value = ""; ocFlushNow(); renderCollab();
+    (st.comments = st.comments || []).push({ kind: clTab, who: resolveNameValue("fioReporter") || "Иван Петров",
+                                             text: v, time: nowHM(), done: false,
+                                             blockId: currentBlockId || null });
+    inp.value = ""; ocFlushNow(); renderCollab(); renderBlocks();
 }
+/* маркеры 💬 в блоках и переход из них (хук app.js) */
+SS_HOOK.commentCount = id => {
+    const st = active();
+    return ((st && st.comments) || []).filter(c => c.blockId === id).length;
+};
+SS_HOOK.showBlockComments = id => {
+    clTab = "comment"; clBlockFilter = id;
+    renderCollab();
+    $("collab").scrollIntoView({ block: "nearest", behavior: "smooth" });
+};
 $("ocPost").onclick = postCollab;
 $("ocCommentText").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); postCollab(); } });
 $("ocAttach").onclick = () => toast("Вложения к комментариям пока не поддерживаются", "warn");
@@ -316,7 +393,6 @@ function renderGraphics() {
 
 /* ---------- APPROVAL ---------- */
 function renderApproval() {
-    const st = active();
     $("ocApproval").innerHTML = `<div id="approvalSteps">
         <div class="ap-row"><span class="ap-num">1</span><span class="ap-main"><b>Экспорт в Word</b>
             <span>Отдать текст на вычитку (без таймкодов)</span></span>
@@ -330,13 +406,9 @@ function renderApproval() {
         <div class="ap-row"><span class="ap-num">4</span><span class="ap-main"><b>MOGRT титры</b>
             <span>Фамилии/должности спикеров и таймкоды для lower third шаблонов</span></span>
             <button data-ap="mogrt">Экспорт</button></div>
-        <div class="ap-row"><span class="ap-num">5</span><span class="ap-main"><b>Этап: ${st.stage}</b>
-            <span>${st.stage === "ON AIR" ? "Сюжет в эфире" : "Клик —перевести на следующий этап"}</span></span>
-            <button data-ap="stage" ${st.stage === "ON AIR" ? "disabled" : ""}>→ Дальше</button></div>
     </div>`;
     const act = { doc: exportWord, imp: importWord,
-                  csv: () => exportCsv(";"), mogrt: () => exportMogrt(";"),
-                  stage: advanceStage };
+                  csv: () => exportCsv(";"), mogrt: () => exportMogrt(";") };
     $("ocApproval").querySelectorAll("[data-ap]").forEach(b => b.onclick = act[b.dataset.ap]);
 }
 
@@ -352,7 +424,7 @@ function renderSummary() {
             <td style="text-align:right;font-family:var(--mono);color:var(--green)">${mmss(d)}</td></tr>`;
     }).join("");
     $("ocSummary").innerHTML = `<h3>${esc(st.title || "Без названия")}</h3>
-        <p class="muted">Этап: ${st.stage} · ID: ${String(st.id).padStart(8, "0")} · ${esc(resolveNameValue("fioReporter") || "корреспондент не указан")}</p>
+        <p class="muted">ИД: ${String(st.id).padStart(8, "0")} · ${esc(resolveNameValue("fioReporter") || "корреспондент не указан")}</p>
         ${state.blocks.length ? `<table><tr><th>#</th><th>Тип</th><th>Спикер</th><th>Текст</th><th>Длит.</th></tr>${rows}</table>
         <p><b style="font-family:var(--mono);color:var(--green)">${mmss(total)}</b> — суммарный хронометраж</p>`
         : '<p class="muted">Сценарий пуст.</p>'}`;
@@ -360,17 +432,19 @@ function renderSummary() {
 function renderSources() {
     const used = new Map();
     state.blocks.forEach(b => b.parts.forEach(p => {
-        const cur = used.get(p.file) || { n: 0, dur: 0 };
-        used.set(p.file, { n: cur.n + 1, dur: cur.dur + (p.out - p.in) });
+        const key = p.path || p.file;
+        const cur = used.get(key) || { n: 0, dur: 0, name: p.file };
+        used.set(key, { n: cur.n + 1, dur: cur.dur + (p.out - p.in), name: p.file });
     }));
-    $("ocSources").innerHTML = used.size ? [...used.entries()].map(([name, u]) =>
-        `<div class="src-item" data-src="${esc(name)}"><span class="src-name">${esc(name)}</span>
+    $("ocSources").innerHTML = used.size ? [...used.entries()].map(([path, u]) =>
+        `<div class="src-item" data-src="${esc(path)}"><span class="src-name" title="${esc(path)}">${esc(u.name)}</span>
          <span class="src-n">${u.n} фр.</span><span class="mi-dur">${mmss(u.dur)}</span></div>`).join("")
         : '<p class="muted">Фрагменты ещё не размечены. Откройте папку с исходниками (меню «Проект» → «Папка исходников…»), отметьте In/Out в мониторе и вставьте фрагмент в блок.</p>';
     $("ocSources").querySelectorAll("[data-src]").forEach(el => el.onclick = () => {
-        const name = el.dataset.src;
+        const path = el.dataset.src;
         switchMediaTab("media");
-        const vf = videoFiles.find(v => v.name === name);
+        let vf = videoFiles.find(v => v.relPath === path);
+        if (!vf) vf = videoFiles.find(v => v.name === path.split("/").pop());
         if (vf) loadVideo(vf);
         else toast("Папка с исходниками не выбрана или файл недоступен — Проект → «Папка исходников…»", "warn");
     });
@@ -380,8 +454,8 @@ function renderSocial() {
     const lead = state.blocks.find(b => b.kind === "vod" || b.kind === "vo");
     const text = ((head && head.text ? head.text + ". " : "") + (lead ? lead.text.replace(/\s+/g, " ") : "")).trim()
         || active().title;
-    $("ocSocial").innerHTML = `<h3>Пост для соцсетей<button class="copy-btn" id="ocCopySocial">Copy</button></h3>
-        <div id="ocSocialText" style="background:#101a22;border:1px solid var(--line);border-radius:3px;padding:10px;white-space:pre-wrap">${esc(text)}</div>
+    $("ocSocial").innerHTML = `<h3>Пост для соцсетей<button class="copy-btn" id="ocCopySocial">Копировать</button></h3>
+        <div id="ocSocialText" class="social-text">${esc(text)}</div>
         <p class="muted">Черновик собран из HEADLINE и первой текстовой подводки — правьте в SCRIPT.</p>`;
     $("ocCopySocial").onclick = () => copyText(text, "Пост скопирован");
 }
@@ -391,11 +465,9 @@ function copyText(t, okMsg) {
         .catch(() => toast("Браузер не дал доступ к буферу обмена", "err"));
 }
 
-/* ---------- NEWSWIRE click → поиск в assigns? (нет), only render ---------- */
-
 /* ---------- общие обновления ---------- */
 function ocRefreshAll() {
-    renderHead(); renderAssignments(); renderTotal(); renderCollab();
+    renderHead(); renderTotal(); renderCollab();
     if (mediaTab === "sots") renderSots();
     if (mediaTab === "graphics") renderGraphics();
     if (mediaTab === "approval") renderApproval();
@@ -404,43 +476,53 @@ function ocRefreshAll() {
     if (centerTab === "social") renderSocial();
 }
 
-/* ---------- обёртки над движком (app.js) ---------- */
-const _rb = renderBlocks;
-renderBlocks = function () { _rb(); ocRefreshAll(); };
-const _ss = saveState;
-saveState = function () { _ss(); ocFlushSoon(); };
-const _rfl = refreshVideoList;
-refreshVideoList = function () { _rfl(); $("ocVidCount").textContent = videoFiles.length; };
-const _os = openSearch;
-openSearch = function () { if ($("view-script").hidden) switchCenterTab("script"); _os(); };
+/* ---------- точки расширения движка (app.js) — без переназначения его функций ---------- */
+SS_HOOK.afterRender = ocRefreshAll;
+SS_HOOK.afterSave = ocFlushSoon;
+SS_HOOK.afterVideoList = () => { $("ocVidCount").textContent = videoFiles.length; };
+SS_HOOK.beforeSearch = () => { if ($("view-script").hidden) switchCenterTab("script"); };
+const TIME_RE = /^\d{1,2}[:.]\d{2}$/;
 /* черновик .json — с метаданными сюжета (этап, даты, комментарии); id не переносим */
-saveDraft = function () {
+SS_HOOK.draftMeta = () => {
     const st = active();
-    download(slug($("storyTitle").value) + "_черновик.json",
-        JSON.stringify({ blocks: state.blocks, nextId: state.nextId, req: store.get("ss_req", {}),
-                         meta: { title: st.title, day: st.day, time: st.time, stage: st.stage,
-                                 stageDates: st.stageDates, targetSec: st.targetSec,
-                                 comments: st.comments, modified: st.modified } }, null, 1),
-        "application/json");
     toast("Черновик сохранён (с этапом и комментариями)", "ok");
+    return { title: st.title, day: st.day, time: st.time, stage: st.stage,
+             stageDates: st.stageDates, targetSec: st.targetSec,
+             comments: st.comments, modified: st.modified };
 };
-const _ldd = loadDraftData;
-loadDraftData = function (d) {
-    const ok = _ldd(d);
-    if (ok && d && d.meta && typeof d.meta === "object") {
-        const st = active();
-        if (d.meta.stage && OC.STAGES.includes(d.meta.stage)) st.stage = d.meta.stage;
-        if (d.meta.stageDates && typeof d.meta.stageDates === "object") st.stageDates = d.meta.stageDates;
-        if (Array.isArray(d.meta.comments)) st.comments = d.meta.comments;
-        if (Number.isFinite(+d.meta.targetSec) && +d.meta.targetSec > 0) st.targetSec = +d.meta.targetSec;
-        if (Number.isFinite(+d.meta.day)) st.day = +d.meta.day;
-        if (d.meta.time) st.time = d.meta.time;
-        ocFlushNow(); renderHead(); renderAssignments();
+/* импорт черновика: всё из meta проверяется — файл мог прийти «извне» */
+SS_HOOK.draftLoaded = d => {
+    if (!d || !d.meta || typeof d.meta !== "object") return;
+    const m = d.meta, st = active();
+    if (typeof m.title === "string" && m.title.trim()) {
+        st.title = normWs(m.title).slice(0, 200);
+        $("storyTitle").value = st.title;
     }
-    return ok;
+    if (m.stage && OC.STAGES.includes(m.stage)) st.stage = m.stage;
+    if (m.stageDates && typeof m.stageDates === "object") {
+        const sd = {};
+        Object.entries(m.stageDates).forEach(([k, v]) => {
+            if (OC.STAGES.includes(k) && typeof v === "string") sd[k] = normWs(v).slice(0, 16);
+        });
+        st.stageDates = sd;
+    }
+    if (Array.isArray(m.comments)) {
+        st.comments = m.comments.filter(c => c && typeof c.text === "string").slice(0, 500).map(c => ({
+            kind: ["comment", "suggestion", "task"].includes(c.kind) ? c.kind : "comment",
+            who: normWs(String(c.who || "")).slice(0, 60),
+            text: String(c.text).slice(0, 2000),
+            time: TIME_RE.test(String(c.time || "").trim()) ? String(c.time).trim() : nowHM(),
+            done: !!c.done,
+            blockId: Number.isFinite(+c.blockId) && +c.blockId > 0 ? +c.blockId : null,
+        }));
+    }
+    if (Number.isFinite(+m.targetSec) && +m.targetSec > 0 && +m.targetSec < 36000) st.targetSec = +m.targetSec;
+    if (+m.day === 1) st.day = 1;
+    if (TIME_RE.test(String(m.time || ""))) st.time = String(m.time);
+    ocFlushNow(); renderHead();
 };
 
-/* верхняя навигация: «Авторы» — реквизиты, «Проект» — меню, остальные (кроме Story) — заглушки */
+/* верхняя навигация: «Проект» — меню, «Сюжет» — активный экран, остальные — заглушки */
 document.querySelectorAll(".gnav .gn").forEach(b => {
     if (b.id === "gnProject") return;
     b.onclick = () => b.dataset.view ? switchCenterTab(b.dataset.view)
@@ -449,11 +531,15 @@ document.querySelectorAll(".gnav .gn").forEach(b => {
 
 /* ---------- меню «Проект»: файлы сюжета и экспорты ---------- */
 const PJ_ITEMS = [
+    { act: "stories", lbl: "🎬 Сюжеты…", title: "Список сюжетов этого браузера — переключение, дублирование, удаление", fn: () => showStoriesMenu($("gnProject")) },
     { act: "new",  lbl: "➕ Создать…",       title: "Новый сюжет в текущем проекте", fn: () => newStoryDialog() },
+    { act: "dup",  lbl: "⧉ Дублировать сюжет", title: "Копия текущего сюжета вместе с блоками и комментариями", fn: () => duplicateStory() },
+    { act: "del",  lbl: "🗑 Удалить сюжет",  title: "Убрать текущий сюжет из списка (и его черновик в этом браузере)", fn: () => deleteStory() },
+    { sep: true },
     { act: "open", lbl: "📂 Открыть…",       title: "Загрузить черновик из файла .json — вернутся блоки, реквизиты и fps", fn: () => loadDraft() },
     { act: "save", lbl: "💾 Сохранить…",     title: "Сохранить текущий сюжет в файл-черновик .json и продолжить позже", fn: () => saveDraft() },
     { sep: true },
-    { act: "dir",  lbl: "📁 Папка исходников…", title: "Выбрать папку с видеофайлами (можно по сети) — список появится в панели MEDIA", fn: () => pickFolderCompat() },
+    { act: "dir",  lbl: "📁 Папка исходников…", title: "Выбрать папку с видеофайлами (можно по сети) — Chrome/Edge запомнят её и ⟳ откроет без выбора", fn: () => pickFolder() },
     { sep: true },
     { act: "wimp", lbl: "📥 Импорт из Word…", title: "Вернуть правки редактора из его Word-файла (.doc/.docx/.txt), обзор «было/стало»", fn: () => importWord() },
     { act: "wexp", lbl: "📤 Экспорт в Word",  title: "Текст сценария без файлов и таймкодов — для редактора", fn: () => exportWord() },
@@ -483,26 +569,36 @@ $("gnProject").onclick = e => {
         if (!menu.contains(ev.target) && ev.target !== $("gnProject")) { closeProjMenu(); document.removeEventListener("mousedown", h); }
     }), 0);
 };
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeProjMenu(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeProjMenu(); closeStoriesMenu(); } });
 ["ocBell", "ocHelp", "ocApps"].forEach(id =>
     $(id).onclick = () => toast("Раздел в разработке", "warn"));
 
 /* ---------- старт ---------- */
 window.addEventListener("beforeunload", () => { clearTimeout(ocFlushT); ocFlushNow(); });
-(function ocInit() {
-    renderWire();
-    if (!localStorage.getItem("ss_view")) setView("thumbs-big");   /* вид по умолчанию — сетка как в референсе */
-    let list = store.get("oc_stories", null);
-    let aid = store.get("oc_active", null);
+document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(ocFlushT); ocFlushNow(); } });
+(async function ocInit() {
+    if (!localStorage.getItem("ss_view")) setView("thumbs-big");
+    /* есть ли рабочий IndexedDB (приватный режим Safari/Firefox умеет отказать) */
+    try { await IDB.put("kv", "_probe", 1); await IDB.del("kv", "_probe"); window.SS_IDB_OK = true; }
+    catch (e) { console.warn("IndexedDB недоступен, остаёмся на localStorage:", e && e.name); }
+    let list = null, aid = null;
+    if (window.SS_IDB_OK) { list = await IDB.get("kv", "oc_stories"); aid = await IDB.get("kv", "oc_active"); }
     if (!Array.isArray(list) || !list.length) {
-        list = seedStories();
-        aid = list[0].id;
-        OC.stories = list; OC.activeId = aid;
-        persistStories();
-    } else {
-        OC.stories = list; OC.activeId = list.some(s => s.id === aid) ? aid : list[0].id;
-        OC.nextNum = Math.max(OC.nextNum, ...list.map(s => s.id + 1));
+        const legacy = store.get("oc_stories", null);          /* первый запуск после обновления — мигрируем из localStorage */
+        if (Array.isArray(legacy) && legacy.length) {
+            list = legacy;
+            if (aid == null) aid = store.get("oc_active", null);
+        }
     }
+    if (!Array.isArray(list) || !list.length) {
+        list = seedStories();                                   /* внутри читается легаси ss_blocks — чистим ключи ПОСЛЕ */
+        aid = list[0].id;
+    }
+    OC.stories = list;
+    OC.activeId = list.some(s => s.id === aid) ? aid : list[0].id;
+    OC.nextNum = Math.max(OC.nextNum, ...list.map(s => s.id + 1));
+    ocInitDone = true;
+    persistStories();                              /* снимок лёг в IDB (или LS-фолбэк); буферные вызовы покрыты им */
+    if (window.SS_IDB_OK) clearHeavyLsKeys();      /* освобождаем до 5 МБ localStorage — там больше не живём */
     loadStory(OC.activeId);
-    renderWire();
 })();
