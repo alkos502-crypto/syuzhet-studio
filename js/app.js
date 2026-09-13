@@ -1262,13 +1262,13 @@ function dupWarning(file) {
 const PART_KINDS = new Set(["sync", "standup", "life", "spiegel"]);
 /* триггеры нового блока: слово в начало новой строки + пробел/Enter */
 const DOC_TRIGGERS = {
-    "зк": "vo", "з/к": "vo", "закадр": "vo", "закадровый": "vo", "vo": "vo",
+    "зк": "vo", "з/к": "vo", "закадр": "vo", "закадровый": "vo", "vo": "vo", "v/o": "vo",
     "синх": "sync", "синхрон": "sync", "sot": "sync",
     "стенд": "standup", "стендап": "standup", "standup": "standup",
-    "лайф": "life", "life": "life",
+    "лайф": "life", "life": "life", "nat": "life", "nats": "life",
     "шпи": "spiegel", "шпигель": "spiegel", "spiegel": "spiegel",
-    "подв": "vod", "подводка": "vod", "лид": "vod", "lead": "vod",
-    "хед": "headline", "хедлайн": "headline", "заголовок": "headline", "headline": "headline",
+    "подв": "vod", "подводка": "vod", "лид": "vod", "lead": "vod", "toss": "vod",
+    "хед": "headline", "хедлайн": "headline", "заголовок": "headline", "headline": "headline", "head": "headline",
 };
 /* смена типа блока из интерфейса удалена: тип задаётся при создании
    (ПКМ по пустому месту или триггер «хед/лид/зк/синх/стенд/лайф/шпи» + пробел) */
@@ -1421,7 +1421,7 @@ function renderBlocks() {
     const known = videoFiles.length ? new Set(videoFiles.map(v => v.relPath)) : null;
     if (!state.blocks.length) {
         host.innerHTML = '<div class="empty-hint">Документ пуст. Нажмите ПКМ по пустому месту — добавить блок, ' +
-            'или наберите в новой строке «хед», «лид», «зк», «синх», «стенд», «лайф», «шпи» + пробел.</div>';
+            'или наберите в новой строке «хед», «зк», «синх»… либо VO / SOT / NAT / HEAD + пробел.</div>';
     }
 
     state.blocks.forEach((b, i) => {
@@ -1448,7 +1448,7 @@ function renderBlocks() {
             <div class="doc-main">
                 ${b.kind === "sync" ? `<div class="doc-speaker">
                     <input class="b-speaker" placeholder="Спикер — ФИО" title="Как в титрах: сначала имя, затем фамилия — так же разбиваются колонки MOGRT" value="${esc(b.speaker)}" aria-label="Спикер">
-                    <span class="sot-suf">(СИНХРОН)</span>
+                    <span class="sot-suf">(SOT)</span>
                     <input class="b-role" placeholder="должность" title="Должность спикера" value="${esc(b.role)}" aria-label="Должность"></div>` : ""}
                 ${foldsum}
                 <textarea class="doc-text" rows="1" placeholder="${ph}" aria-label="Текст блока">${esc(b.text)}</textarea>
@@ -1560,7 +1560,7 @@ function renderBlocks() {
                 e.preventDefault();
                 const rel = e.dataTransfer.getData("text/x-ss-file");
                 if (PART_KINDS.has(b.kind)) addWholeFilePart(b, rel);
-                else toast("Фрагменты бывают только в СИНХ / СТЕНД / ЛАЙФ / ШПИГ", "warn");
+                else toast("Фрагменты бывают только в SOT / STANDUP / LIFE / SPIEGEL", "warn");
             }
         });
         div.addEventListener("dragend", dragCleanup);
@@ -1625,7 +1625,7 @@ function refreshTargets() {
 /* отправка разметки: фрагмент In→Out в текущий блок (куда курсор) */
 $("btnSend").addEventListener("click", () => {
     const b = state.blocks.find(x => x.id === currentBlockId);
-    if (!b) return toast("Кликните в СИНХ/СТЕНД/ЛАЙФ/ШПИГ (или создайте блок ПКМ), затем «В сценарий →»", "err", 5000);
+    if (!b) return toast("Кликните в SOT/STANDUP/LIFE/SPIEGEL (или создайте блок ПКМ), затем «Send →»", "err", 5000);
     if (!PART_KINDS.has(b.kind)) return toast("Текущий блок — только текст. Фрагменты — в SOT, стендап, лайф или шпигель", "err", 5000);
     pullPart(b);
 });
