@@ -237,11 +237,11 @@ function renderHead() {
 /* ---------- статус-бар: сохранение / FPS ---------- */
 function sbDirty() {
     const e = $("sbSaved");
-    if (e) { e.textContent = "…изменения"; e.classList.add("dirty"); }
+    if (e) { e.textContent = "…unsaved"; e.classList.add("dirty"); }
 }
 function sbSaved(time) {
     const e = $("sbSaved");
-    if (e) { e.textContent = "✓ " + (time || nowHM()) + " сохранено"; e.classList.remove("dirty"); }
+    if (e) { e.textContent = "✓ " + (time || nowHM()) + " saved"; e.classList.remove("dirty"); }
 }
 $("fpsInput").addEventListener("input", () => { $("sbFps").textContent = $("fpsInput").value || "—"; });
 $("storyTitle").addEventListener("input", () => { sbDirty(); ocFlushSoon(); });
@@ -360,7 +360,7 @@ function renderTotal() {
     const pl = $("ocTotalPlan");
     if (!pl) return;
     pl.hidden = false;
-    pl.textContent = (st.targetSec > 0 ? "план " + mmss(st.targetSec) : "задать план") + " ✎";
+    pl.textContent = st.targetSec > 0 ? "plan " + mmss(st.targetSec) : "set plan";
     pl.title = "Хронометраж-цель сюжета — клик, чтобы изменить (мм:сс)";
 }
 $("ocTotalPlan").onclick = async () => {

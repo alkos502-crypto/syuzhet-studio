@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>МЕДИАЦЕНТР — Сюжеты</title>
+<title>МЕДИАЦЕНТР — Stories</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -12,8 +12,8 @@
 <header id="topnav">
     <div class="brand"><span class="brand-dot"></span>МЕДИАЦЕНТР</div>
     <nav class="gnav">
-        <button class="gn" id="gnProject">Проект</button>
-        <button class="gn active" id="gnStory">Сюжет</button>
+        <button class="gn" id="gnProject">Project</button>
+        <button class="gn active" id="gnStory">Story</button>
     </nav>
     <span class="spacer"></span>
     <button class="ib" id="ocBell" title="Уведомления">
@@ -40,21 +40,21 @@
 
     <div id="storyHead">
         <div class="sh-row">
-            <input id="storyTitle" class="sh-title" placeholder="Название сюжета" title="Название сюжета">
+            <input id="storyTitle" class="sh-title" placeholder="Story title" title="Story title">
         </div>
         <div class="sh-row sh-meta">
             <div class="nf-row">
-                <label>КОРР</label>
+                <label>REP</label>
                 <select id="fioReporter" data-role="корреспондента" title="Корреспондент сюжета"></select>
                 <button class="nf-gear" data-names="fioReporter" title="Изменить и удалить имена" aria-label="Управление списками имён">⚙</button>
             </div>
             <div class="nf-row">
-                <label>ОПЕР</label>
+                <label>CAM</label>
                 <select id="fioCam" data-role="оператора" title="Оператор сюжета"></select>
                 <button class="nf-gear" data-names="fioCam" title="Изменить и удалить имена" aria-label="Управление списками имён">⚙</button>
             </div>
             <div class="nf-row">
-                <label>МОНТ</label>
+                <label>EDIT</label>
                 <select id="fioEditor" data-role="монтажёра" title="Монтажёр сюжета"></select>
                 <button class="nf-gear" data-names="fioEditor" title="Изменить и удалить имена" aria-label="Управление списками имён">⚙</button>
             </div>
@@ -64,9 +64,9 @@
                      title="Частота кадров проекта. 25 / 29.97 / 50… — должна совпадать с секвенцией в Premiere">
             </div>
             <div class="nf-row">
-                <label>ТЕМП</label>
+                <label>PACE</label>
                 <input id="readSpeed" type="number" min="60" max="2400" step="10" value="540" class="sh-num"
-                     title="Темп чтеца, зн/мин — для оценки хронометража текстовых блоков (ЗАГ, ПОДВ, ЗК) без фрагментов. 540 ≈ телеграфный темп">
+                     title="Темп чтеца, зн/мин — для оценки хронометража текстовых блоков (HEADLINE, LEAD, VO) без фрагментов. 540 ≈ телеграфный темп">
             </div>
             <span class="spacer"></span>
             <div class="sh-actions">
@@ -85,10 +85,10 @@
     </div>
 
     <div class="tabs" id="ocTabs" role="tablist" aria-label="Разделы сюжета">
-        <button class="tab active" role="tab" aria-selected="true" data-view="script">Сценарий</button>
+        <button class="tab active" role="tab" aria-selected="true" data-view="script">Script</button>
         <button class="tab" role="tab" aria-selected="false" data-view="summary">Rundown</button>
-        <button class="tab" role="tab" aria-selected="false" data-view="sources">Источники</button>
-        <button class="tab" role="tab" aria-selected="false" data-view="social">Соцсети</button>
+        <button class="tab" role="tab" aria-selected="false" data-view="sources">Sources</button>
+        <button class="tab" role="tab" aria-selected="false" data-view="social">Social</button>
     </div>
 
     <div id="centerScroll">
@@ -109,7 +109,7 @@
             </div>
             <div id="miniTl" class="mini-tl" hidden aria-label="Мини-таймлайн сюжета"></div>
             <div id="findBar" class="findbar" hidden>
-                <input id="findInput" type="search" placeholder="Поиск по сюжету…  (Enter — далее, Shift+Enter — назад, Esc — закрыть)" style="flex:1; min-width:0">
+                <input id="findInput" type="search" placeholder="Search in story…  (Enter — next, Shift+Enter — back, Esc — close)" style="flex:1; min-width:0">
                 <span id="findCount" class="muted"></span>
                 <button id="findPrev" title="Предыдущее (Shift+Enter)">↑</button>
                 <button id="findNext" title="Следующее (Enter)">↓</button>
@@ -145,13 +145,13 @@
         </div>
         <div class="panel-body pbb-flush">
             <div class="tabs cl-tabs" role="tablist" aria-label="Комментарии и задачи">
-                <button class="tab active" role="tab" aria-selected="true" data-cl="comment">Комментарии (<span id="clCount-comment">0</span>)</button>
-                <button class="tab" role="tab" aria-selected="false" data-cl="suggestion">Предложения (<span id="clCount-suggestion">0</span>)</button>
-                <button class="tab" role="tab" aria-selected="false" data-cl="task">Задачи (<span id="clCount-task">0</span>)</button>
+                <button class="tab active" role="tab" aria-selected="true" data-cl="comment">Comments (<span id="clCount-comment">0</span>)</button>
+                <button class="tab" role="tab" aria-selected="false" data-cl="suggestion">Suggestions (<span id="clCount-suggestion">0</span>)</button>
+                <button class="tab" role="tab" aria-selected="false" data-cl="task">Tasks (<span id="clCount-task">0</span>)</button>
             </div>
             <div id="ocCollabList" class="cl-list"></div>
             <div class="cl-input">
-                <input id="ocCommentText" placeholder="Написать комментарий…" aria-label="Новый комментарий">
+                <input id="ocCommentText" placeholder="Add a comment…" aria-label="Новый комментарий">
                 <span class="cl-icons">
                     <button id="ocAttach" class="ib" title="Вложение" aria-label="Вложение">
                         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 12-8.5 8.5a5 5 0 0 1-7-7L14 5a3.5 3.5 0 0 1 5 5l-8.5 8.5a1.5 1.5 0 0 1-2-2L16 9"/></svg>
@@ -172,17 +172,17 @@
 <!-- ============================ RIGHT: MEDIA / SOTs / GRAPHICS / APPROVAL ============================ -->
 <aside id="rightcol">
     <div class="tabs rc-tabs" id="ocMediaTabs" role="tablist" aria-label="Панели справа">
-        <button class="tab active" role="tab" aria-selected="true" data-mv="media">Медиа</button>
-        <button class="tab" role="tab" aria-selected="false" data-mv="sots">Синхроны</button>
-        <button class="tab" role="tab" aria-selected="false" data-mv="graphics">Графика</button>
-        <button class="tab" role="tab" aria-selected="false" data-mv="approval">Утверждение</button>
+        <button class="tab active" role="tab" aria-selected="true" data-mv="media">Media</button>
+        <button class="tab" role="tab" aria-selected="false" data-mv="sots">SOTs</button>
+        <button class="tab" role="tab" aria-selected="false" data-mv="graphics">Graphics</button>
+        <button class="tab" role="tab" aria-selected="false" data-mv="approval">Approval</button>
     </div>
 
     <div class="mview" id="mv-media" role="tabpanel">
         <!-- МОНИТОР (Source Monitor): плеер + метки In/Out + транспорт -->
         <section class="panel-sec" data-panel="monitor">
             <div class="panel-head">
-                <span class="ph-title">Монитор</span>
+                <span class="ph-title">Monitor</span>
                 <span id="monFile" class="ph-file" title=""></span>
                 <span class="spacer"></span>
                 <button class="ph-fold" aria-expanded="true" title="Свернуть/развернуть панель">▾</button>
@@ -217,7 +217,7 @@
                         <button id="btnSetIn" class="mark in" title="Поставить In (I)" aria-label="Поставить In">{ In</button>
                         <button id="btnSetOut" class="mark out" title="Поставить Out (O)" aria-label="Поставить Out">Out }</button>
                         <span id="curBlock" class="cur-block" title="Блок-цель кнопки «В сценарий →» (кликните в блок, чтобы сменить)"></span>
-                        <button id="btnSend" class="accent" title="Отправить фрагмент In→Out в текущий блок сценария">В сценарий →</button>
+                        <button id="btnSend" class="accent" title="Отправить фрагмент In→Out в текущий блок сценария">Send →</button>
                         <button id="btnClearMarks" class="ti" title="Сбросить к краям файла" aria-label="Сбросить метки In/Out">✕</button>
                     </div>
                 </div>
@@ -226,8 +226,8 @@
 
         <section class="panel-sec" data-panel="browser">
             <div class="panel-head">
-                <span class="ph-title">Медиабраузер (<b id="ocVidCount">0</b>)</span>
-                <span id="folderName" class="mv-dir muted" title="Папка исходников — меню «Проект» → «Папка исходников…»; ⟳ перечитывает её без повторного выбора"></span>
+                <span class="ph-title">Media Browser (<b id="ocVidCount">0</b>)</span>
+                <span id="folderName" class="mv-dir muted" title="Source folder — Project → «Папка исходников…»; ⟳ reloads it without re-picking"></span>
                 <span class="spacer"></span>
                 <span class="view-toggle">
                     <button id="viewList" title="Списком" aria-label="Вид: списком">
@@ -246,7 +246,7 @@
                 <button class="ph-fold" aria-expanded="true" title="Свернуть/развернуть панель">▾</button>
             </div>
             <div class="panel-body">
-                <input type="search" id="videoSearch" placeholder="Поиск файлов…" class="mv-search" aria-label="Поиск файлов">
+                <input type="search" id="videoSearch" placeholder="Search files…" class="mv-search" aria-label="Поиск файлов">
                 <div id="videoList" class="vl-list"></div>
             </div>
         </section>
@@ -255,7 +255,7 @@
     <div class="mview" id="mv-sots" hidden role="tabpanel">
         <section class="panel-sec" data-panel="sots">
             <div class="panel-head">
-                <span class="ph-title">SOT-лист</span>
+                <span class="ph-title">SOT List</span>
                 <span class="spacer"></span>
                 <button class="ph-fold" aria-expanded="true" title="Свернуть/развернуть панель">▾</button>
             </div>
@@ -265,7 +265,7 @@
     <div class="mview" id="mv-graphics" hidden role="tabpanel">
         <section class="panel-sec" data-panel="graphics">
             <div class="panel-head">
-                <span class="ph-title">Графика</span>
+                <span class="ph-title">Graphics</span>
                 <span class="spacer"></span>
                 <button class="ph-fold" aria-expanded="true" title="Свернуть/развернуть панель">▾</button>
             </div>
@@ -287,13 +287,13 @@
 </div><!-- /#workspace -->
 
 <footer id="statusbar">
-    <span class="sb-id">ИД <b id="ocStoryId">—</b> · изм. <b id="ocModified">—</b></span>
+    <span class="sb-id">ID <b id="ocStoryId">—</b> · mod <b id="ocModified">—</b></span>
     <span class="vsep"></span>
     <span class="sb-id">FPS <b id="sbFps">25</b></span>
     <span class="spacer"></span>
     <div class="total-row">
-        <span>ИТОГО</span><b id="ocTotal">00:00</b>
-        <button id="ocTotalPlan" class="plan-btn" hidden>план ✎</button>
+        <span>Total</span><b id="ocTotal">00:00</b>
+        <button id="ocTotalPlan" class="plan-btn" hidden>set plan</button>
     </div>
     <span class="vsep"></span>
     <span id="sbSaved" class="sb-saved">✓</span>
