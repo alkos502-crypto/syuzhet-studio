@@ -302,7 +302,8 @@ document.querySelectorAll(".ph-fold").forEach(b => b.onclick = () => {
     const fs = foldState();
     fs[sec.dataset.panel] = !fs[sec.dataset.panel];
     try { localStorage.setItem("ss_fold", JSON.stringify(fs)); } catch (e) {}
-applyFolds();
+    applyFolds();
+});
 
 /* ---------- сплиттер центр↔право: ширина правой колонки в ss_rcw ---------- */
 (function () {
@@ -319,11 +320,13 @@ applyFolds();
         e.preventDefault();
         const x0 = e.clientX, w0 = rc.getBoundingClientRect().width;
         sp.classList.add("drag");
+        document.body.style.userSelect = "none";      /* не выделять текст колонок во время тяги */
         const mv = ev => setW(w0 + (x0 - ev.clientX));
         const up = () => {
             document.removeEventListener("mousemove", mv);
             document.removeEventListener("mouseup", up);
             sp.classList.remove("drag");
+            document.body.style.userSelect = "";
         };
         document.addEventListener("mousemove", mv);
         document.addEventListener("mouseup", up);
@@ -333,7 +336,7 @@ applyFolds();
         try { localStorage.removeItem("ss_rcw"); } catch (e) {}
     });
 })();
-});
+
 /* активная панель — рамка-подсветка шапки, как в Premiere */
 document.addEventListener("pointerdown", e => {
     const sec = e.target.closest(".panel-sec");

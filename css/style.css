@@ -122,7 +122,7 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     #rightcol { flex: 0 0 470px; }
 }
 /* ---- сплиттер центр↔право (drag — ширина, dblclick — сброс) ---- */
-#vsplit { flex: 0 0 5px; background: var(--line); cursor: col-resize; transition: background-color .12s ease-out; }
+#vsplit { flex: 0 0 7px; background: var(--line); cursor: col-resize; transition: background-color .12s ease-out; }
 #vsplit:hover, #vsplit.drag { background: var(--accent); }
 
 /* ---- секционные заголовки ---- */
