@@ -1457,7 +1457,6 @@ function renderBlocks() {
                     <input class="b-speaker" placeholder="${titrWho} — ФИО" title="Как в титрах: сначала имя, затем фамилия — так же разбиваются колонки MOGRT" value="${esc(b.speaker)}" aria-label="${titrWho}">
                     <span class="ts-sep"></span>
                     <input class="b-role" placeholder="должность" title="Должность в титрах" value="${esc(b.role)}" aria-label="Должность">
-                    <span class="ts-code ${b.kind}">${esc(KIND_META[b.kind].badge)}</span>
                 </div>` : ""}
                 ${foldsum}
                 <textarea class="doc-text" rows="1" placeholder="${ph}" aria-label="Текст блока">${esc(b.text)}</textarea>

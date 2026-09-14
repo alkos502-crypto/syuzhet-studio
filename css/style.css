@@ -266,10 +266,10 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .doc-text::placeholder { color: var(--text3); font-style: italic; }
 /* расшифровки (СИНХ/СТЕНД/ЛАЙФ/ШПИГ = блоки с фрагментами) — курсивом */
 .doc-block.has-parts .doc-text { font-style: italic; }
-/* титровая пилюля SOT/STANDUP: person-иконка + ИМЯ ФАМИЛИЯ | должность + код типа */
+/* титровая пилюля SOT/STANDUP: person-иконка + ИМЯ ФАМИЛИЯ | должность (на всю ширину) */
 .doc-speaker {
-    display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
-    margin: 0 0 3px; padding: 1px 6px 1px 8px;
+    display: flex; align-items: center; gap: 6px; max-width: 100%;
+    margin: 0 0 3px; padding: 1px 10px 1px 8px;
     background: var(--input-bg); border: 1px solid var(--line); border-radius: 999px;
     color: var(--text3); transition: border-color .12s ease-out;
 }
@@ -284,14 +284,8 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .doc-speaker .b-role {
     border: none; background: transparent; outline: none; padding: 2px 0;
     font: italic 400 12px/1.4 sans-serif;
-    color: var(--text2); width: 16ch; min-width: 0; max-width: 34%;
+    color: var(--text2); flex: 1; min-width: 0;
 }
-.doc-speaker .ts-code {
-    flex: 0 0 auto; font: 700 9px sans-serif; letter-spacing: .06em; text-transform: uppercase;
-    padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--text3);
-}
-.doc-speaker .ts-code.sync    { color: var(--kt-sync); border-color: rgba(223,88,79,.4);    background: rgba(223,88,79,.12); }
-.doc-speaker .ts-code.standup { color: var(--kt-standup); border-color: rgba(148,113,223,.4); background: rgba(148,113,223,.12); }
 .doc-speaker .b-speaker::placeholder { color: var(--text3); }
 .fold-sum .fs-titr { color: #fff; font-weight: 700; font-style: normal; text-transform: none; }
 .doc-parts { margin: 3px 0 0; font-family: var(--mono); }
