@@ -694,7 +694,7 @@ function cpItems() {
     });
     PJ_ITEMS.forEach(it => { if (!it.sep) items.push({ g: "Команда", t: it.lbl, h: it.title, run: it.fn }); });
     items.push({ g: "Команда", t: "🔍 Поиск по сюжету", h: "Ctrl+F", run: () => openSearch() });
-    items.push({ g: "Команда", t: "📁 Папка исходников…", h: "выбор или повторное открытие (⟳)", run: folderAction });
+    items.push({ g: "Команда", t: "📁 Папка исходников…", h: "выбор папки; перечитать — ⟳ в Media Browser", run: () => pickFolder() });
     items.push({ g: "Команда", t: "⚙ Настройки сюжета", h: "FPS и темп чтеца", run: openSetup });
     items.push({ g: "Команда", t: "⤡ Свернуть / развернуть все блоки", h: null, run: () => $("btnFoldAll").click() });
     items.push({ g: "Команда", t: "⌨ Горячие клавиши", h: "?", run: openKeys });
@@ -748,10 +748,9 @@ document.addEventListener("keydown", e => {
 });
 
 /* ---------- шапка сюжета: папка исходников и настройки (N1/N2) ---------- */
-function folderAction() {
-    if (dirHandle) openDirHandle(); else pickFolder();   /* тот же путь, что у ⟳ в Media Browser */
-}
-$("btnFolderHead").onclick = folderAction;
+/* кнопка в шапке = всегда диалог выбора (смена пути); ⟳ в Media Browser перечитывает
+   последнюю папку без повторного выбора — разные семантики по просьбе юзера */
+$("btnFolderHead").onclick = () => pickFolder();
 function openSetup() { $("setupModal").hidden = false; $("fpsInput").focus(); $("fpsInput").select(); }
 function closeSetup() { $("setupModal").hidden = true; }
 $("btnStorySetup").onclick = openSetup;
