@@ -989,6 +989,7 @@ const ICONS = {
     life:     '<circle cx="12" cy="12" r="1.9"/><path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6"/><path d="M5.4 5.4a9.4 9.4 0 0 0 0 13.2M18.6 5.4a9.4 9.4 0 0 1 0 13.2"/>',
     spiegel:  '<rect x="3.5" y="4" width="17" height="10" rx="1.5"/><path d="M7 8h10M7 10.8h6"/><path d="M7 18.4h10"/>',
     gear:     '<circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/>',
+    person:   '<circle cx="12" cy="7.6" r="3.4"/><path d="M5.5 20.5c1.2-3.8 3.6-5.8 6.5-5.8s5.3 2 6.5 5.8"/>',
     bubble:   '<path d="M21 14.5a3 3 0 0 1-3 3H8l-5 4.2V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3z"/>',
     film:     '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M7.2 5v14M16.8 5v14M3 9.7h4.2M3 14.3h4.2M16.8 9.7H21M16.8 14.3H21"/>',
     x:        '<path d="m6 6 12 12M18 6 6 18"/>',
@@ -1158,7 +1159,7 @@ function updateMiniTl() {
     bar.innerHTML = state.blocks.map(b => {
         const dur = blockDur(b);
         const t = (b.text || "").replace(/\s+/g, " ").trim();
-        const sp = b.kind === "sync" && b.speaker ? " · " + b.speaker : "";
+        const sp = TITR_KINDS.has(b.kind) && b.speaker ? " · " + b.speaker : "";
         return `<div class="mt-seg ${b.kind}" draggable="true" data-mt="${b.id}" style="flex-grow:${Math.max(dur, 1)}"
             title="${esc(KIND_META[b.kind].badge)} · ${durTc(dur) || "—"}${esc(sp)}${t ? " · " + esc(t.slice(0, 80)) : ""}"></div>`;
     }).join("");
@@ -1214,7 +1215,7 @@ $("miniTl").addEventListener("dragend", dragCleanup);
 /* заголовок блока для тостов/подтверждений/экспорта (внутренние русские имена) */
 function blockTitle(b, n) {
     if (b.kind === "vo") return `ЗК ${n}`;
-    if (b.kind === "standup") return `Стендап ${n}`;
+    if (b.kind === "standup") return `Стендап ${n}` + (b.speaker ? ` — ${b.speaker}` : "");
     if (b.kind === "life") return `Лайф ${n}`;
     if (b.kind === "spiegel") return "Шпигель";
     if (b.kind === "vod") return "Подводка";
@@ -1260,6 +1261,8 @@ function dupWarning(file) {
 
 /* ---------- «печатная машинка»: набор текста как в Word ---------- */
 const PART_KINDS = new Set(["sync", "standup", "life", "spiegel"]);
+/* типы с титровой строкой (имя+должность в кадре): синхрон и стендап */
+const TITR_KINDS = new Set(["sync", "standup"]);
 /* триггеры нового блока: слово в начало новой строки + пробел/Enter */
 const DOC_TRIGGERS = {
     "зк": "vo", "з/к": "vo", "закадр": "vo", "закадровый": "vo", "vo": "vo", "v/o": "vo",
@@ -1325,7 +1328,7 @@ function docMergePrev(b, i) {
     histBefore();
     const joinAt = (prev.text || "").length;
     prev.text = (prev.text ? prev.text + "\n" : "") + b.text;
-    if (prev.kind === "sync" && !prev.speaker && b.speaker) { prev.speaker = b.speaker; prev.role = b.role; }
+    if (TITR_KINDS.has(prev.kind) && !prev.speaker && b.speaker) { prev.speaker = b.speaker; prev.role = b.role; }
     if (b.parts.length) prev.parts = prev.parts.concat(b.parts);
     state.blocks.splice(i, 1);
     renderBlocks(); saveState(); refreshTargets();
@@ -1439,17 +1442,23 @@ function renderBlocks() {
                    b.kind === "spiegel" ? "Текст шпигеля…" :
                    b.kind === "vod" ? "Текст подводки (отвода)…" : "Текст…";
         const foldsum = b.folded
-            ? `<div class="fold-sum">${esc((b.text || "").replace(/\s+/g, " ").trim().slice(0, 90)) ||
-               (b.speaker ? esc(b.speaker) : "без текста")}<span class="muted">
+            ? `<div class="fold-sum">${TITR_KINDS.has(b.kind) && b.speaker
+                  ? `<b class="fs-titr">${esc(b.speaker)}${b.role ? " · " + esc(b.role) : ""}</b>` : ""}
+               ${esc((b.text || "").replace(/\s+/g, " ").trim().slice(0, 90)) ||
+               (b.speaker ? "" : "без текста")}<span class="muted">
                ${b.parts.length ? " · " + b.parts.length + " фр." : ""}</span></div>` : "";
+        const titrWho = b.kind === "sync" ? "Спикер" : "Репортёр";
         const cN = SS_HOOK.commentCount(b.id);
         div.innerHTML = `
             <button class="badge ${b.kind}" title="Клик — свернуть/развернуть; перетащить — изменить порядок">${badgeHtml(b.kind)}</button>
             <div class="doc-main">
-                ${b.kind === "sync" ? `<div class="doc-speaker">
-                    <input class="b-speaker" placeholder="Спикер — ФИО" title="Как в титрах: сначала имя, затем фамилия — так же разбиваются колонки MOGRT" value="${esc(b.speaker)}" aria-label="Спикер">
-                    <span class="sot-suf">(SOT)</span>
-                    <input class="b-role" placeholder="должность" title="Должность спикера" value="${esc(b.role)}" aria-label="Должность"></div>` : ""}
+                ${TITR_KINDS.has(b.kind) ? `<div class="doc-speaker">
+                    ${icon("person", 13)}
+                    <input class="b-speaker" placeholder="${titrWho} — ФИО" title="Как в титрах: сначала имя, затем фамилия — так же разбиваются колонки MOGRT" value="${esc(b.speaker)}" aria-label="${titrWho}">
+                    <span class="ts-sep"></span>
+                    <input class="b-role" placeholder="должность" title="Должность в титрах" value="${esc(b.role)}" aria-label="Должность">
+                    <span class="ts-code ${b.kind}">${esc(KIND_META[b.kind].badge)}</span>
+                </div>` : ""}
                 ${foldsum}
                 <textarea class="doc-text" rows="1" placeholder="${ph}" aria-label="Текст блока">${esc(b.text)}</textarea>
                 ${PART_KINDS.has(b.kind) ? `<div class="doc-parts"></div>` : ""}
@@ -1507,7 +1516,7 @@ function renderBlocks() {
             if (e.altKey && e.key === "ArrowDown") { e.preventDefault(); moveBlock(b.id, +1); return; }
             if (e.altKey && e.key === "Enter")     { e.preventDefault(); pullPart(b); return; }
         });
-        if (b.kind === "sync") {
+        if (TITR_KINDS.has(b.kind)) {
             div.querySelector(".b-speaker").addEventListener("input", e => { histTyping(); b.speaker = e.target.value; saveState(); refreshTargets(); });
             div.querySelector(".b-role").addEventListener("input", e => { histTyping(); b.role = e.target.value; saveState(); });
         }
@@ -1681,7 +1690,7 @@ function collectFind(q) {
     if (!q) { $("findCount").textContent = ""; return; }
     const needle = q.toLowerCase();
     state.blocks.forEach(b => {
-        const hay = (b.kind === "sync" ? (b.speaker + " " + b.role + "\n") : "") + b.text;
+        const hay = (TITR_KINDS.has(b.kind) ? (b.speaker + " " + b.role + "\n") : "") + b.text;
         let i = hay.toLowerCase().indexOf(needle);
         while (i !== -1) {
             findHits.push({ id: b.id, start: i });
@@ -1702,7 +1711,7 @@ function gotoFind(delta) {
     const ta = document.querySelector('.doc-block[data-id="' + h.id + '"] .doc-text');
     $("findCount").textContent = (findPos + 1) + " / " + findHits.length;
     if (ta) {
-        const inText = Math.max(0, h.start - ((b.kind === "sync") ? (b.speaker + " " + b.role + "\n").length : 0));
+        const inText = Math.max(0, h.start - (TITR_KINDS.has(b.kind) ? (b.speaker + " " + b.role + "\n").length : 0));
         ta.scrollIntoView({ block: "center", behavior: "smooth" });
         ta.focus();
         try { ta.setSelectionRange(inText, inText + ($("findInput").value || "").length); } catch (e) {}
@@ -1757,7 +1766,7 @@ function buildCsv(sep) {
             b.text.split(/\r?\n/).forEach(t => L.push("# " + t));
             b.parts.forEach((p, pi) =>
                 L.push(row(p.file, tc(p.in), tc(p.out),
-                           b.parts.length > 1 ? `СТЕНД${suN}-${pi + 1}` : `СТЕНД${suN}`,
+                           b.parts.length > 1 ? `СТЕНД${suN}-${pi + 1}${b.speaker ? " " + b.speaker : ""}` : `СТЕНД${suN}${b.speaker ? " " + b.speaker : ""}`,
                            p.path || p.file)));
         } else if (b.kind === "life") {
             liN++;
@@ -1867,7 +1876,7 @@ function buildDocx() {
         let head, ital = false;
         if (b.kind === "headline") { hdN++; head = "Заголовок " + hdN; }
         else if (b.kind === "vo") { voN++; head = "Закадровый текст " + voN; }
-        else if (b.kind === "standup") { suN++; head = "Стендап " + suN; ital = true; }
+        else if (b.kind === "standup") { suN++; head = "Стендап " + suN + (b.speaker ? ". " + b.speaker + (b.role ? ", " + b.role : "") : ""); ital = true; }
         else if (b.kind === "life") { liN++; head = "Лайф " + liN; ital = true; }
         else if (b.kind === "spiegel") { head = "Шпигель"; ital = true; }
         else if (b.kind === "vod") { head = "Подводка"; }
@@ -1955,7 +1964,7 @@ function buildMogrtCsv(sep) {
     L.push("# MOGRT — нижние титры, собрано в «Сюжет-Студии»");
     L.push("# Сюжет: " + ($("storyTitle").value || "—"));
     L.push("# Таймкод: NDF " + fpsVal() + " к/с; Дата: " + new Date().toISOString().slice(0, 10));
-    L.push("# Порядок = появление синхронов в сценарии; «вход» = таймкод первого фрагмента (момент появления плашки)");
+    L.push("# Порядок = появление титров в сценарии (сначала синхроны, затем стендапы); «вход» = таймкод первого фрагмента (момент появления плашки)");
     L.push("#");
     L.push(row("№", "фамилия", "имя", "отчество", "должность", "вход", "спикер целиком", "файл входа", "путь"));
     let syN = 0;
@@ -1968,13 +1977,22 @@ function buildMogrtCsv(sep) {
                    p0 ? tc(p0.in) : "", b.speaker || "",
                    p0 ? p0.file : "", p0 ? (p0.path || p0.file) : ""));
     });
+    state.blocks.forEach(b => {
+        if (b.kind !== "standup" || !b.speaker) return;
+        syN++;
+        const f = parseFio(b.speaker);
+        const p0 = b.parts[0];
+        L.push(row(syN, f.last, f.first, f.mid, b.role || "",
+                   p0 ? tc(p0.in) : "", b.speaker,
+                   p0 ? p0.file : "", p0 ? (p0.path || p0.file) : ""));
+    });
     return "\uFEFF" + L.join("\r\n");
 }
 function exportMogrt(sep) {
-    const n = state.blocks.filter(b => b.kind === "sync").length;
-    if (!n) return toast("В сценарии нет синхронов (SOT)", "err");
+    const n = state.blocks.filter(b => b.kind === "sync" || (b.kind === "standup" && b.speaker)).length;
+    if (!n) return toast("В сценарии нет титров (синхронов или стендапов с ФИО)", "err");
     download(slug($("storyTitle").value) + "_mogrt.csv", buildMogrtCsv(sep), "text/csv;charset=utf-8");
-    toast("Файл титров для MOGRT сохранён (синхронов: " + n + ")", "ok");
+    toast("Файл титров для MOGRT сохранён (плашек: " + n + ")", "ok");
 }
 
 /* ---------- черновик JSON + автосохранение ---------- */
@@ -2058,7 +2076,12 @@ function parseWordHead(h) {
         const d = h.match(/\d+/);
         return { kind: "vo", num: d ? +d[0] : NaN };
     }
-    if ((m = h.match(/^стендап\s*(\d+)/i)) || (m = h.match(/^standup\s*(\d+)/i))) return { kind: "standup", num: +m[1] };
+    if ((m = h.match(/^стендап\s*(\d+)\s*[.．]?\s*(.*)$/i)) || (m = h.match(/^standup\s*(\d+)\s*[.．]?\s*(.*)$/i))) {
+        const parts = (m[2] || "").split(/[,;]/);
+        return { kind: "standup", num: +m[1],
+                 speaker: (parts.shift() || "").replace(/^—+\s*/, "").trim(),
+                 role: parts.join(", ").trim() };
+    }
     if ((m = h.match(/^лайф\s*(\d+)/i)) || (m = h.match(/^life\s*(\d+)/i))) return { kind: "life", num: +m[1] };
     if (/^шпигель/i.test(h) || /^spiegel/i.test(h)) return { kind: "spiegel" };
     if (/^подвод/i.test(h) || /^lead\b/i.test(h)) return { kind: "vod" };
@@ -2226,13 +2249,13 @@ function buildWordPlan(parsed) {
         let b;
         if (Number.isFinite(it.num)) b = free.find(x => nums[x.id] === it.num);
         if (!b && (it.kind === "spiegel" || it.kind === "vod")) b = free[0];
-        if (!b && it.kind === "sync" && it.speaker)          /* подстраховка: поиск по спикеру */
+        if (!b && TITR_KINDS.has(it.kind) && it.speaker)     /* подстраховка: поиск по спикеру */
             b = free.find(x => normWs(x.speaker).toLowerCase() === it.speaker.toLowerCase());
         if (!b) { fresh.push(it); return; }
         used.add(b.id);
         const textChanged = normWs(it.text) !== normWs(b.text);
-        const speakerChanged = b.kind === "sync" && it.speaker && normWs(it.speaker) !== normWs(b.speaker);
-        const roleChanged = b.kind === "sync" && it.role && normWs(it.role) !== normWs(b.role);
+        const speakerChanged = TITR_KINDS.has(b.kind) && it.speaker && normWs(it.speaker) !== normWs(b.speaker);
+        const roleChanged = TITR_KINDS.has(b.kind) && it.role && normWs(it.role) !== normWs(b.role);
         rows.push({ b, it, removed: false, changed: textChanged || speakerChanged || roleChanged,
                     textChanged, speakerChanged, roleChanged });
     });

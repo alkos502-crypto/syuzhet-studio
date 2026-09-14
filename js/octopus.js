@@ -498,7 +498,7 @@ function renderApproval() {
             <span>Файлы и таймкоды для сборки сюжета (CSV «;», есть вариант для Excel в меню «Проект»)</span></span>
             <button class="accent" data-ap="csv">Экспорт</button></div>
         <div class="ap-row"><span class="ap-num">4</span><span class="ap-main"><b>MOGRT титры</b>
-            <span>Фамилии/должности спикеров и таймкоды для lower third шаблонов</span></span>
+            <span>Фамилии/должности спикеров и репортёров и таймкоды для lower third шаблонов</span></span>
             <button data-ap="mogrt">Экспорт</button></div>
     </div>`;
     const act = { doc: exportWord, imp: importWord,
@@ -513,7 +513,7 @@ function renderSummary() {
     const rows = state.blocks.map((b, i) => {
         const d = blockDur(b); total += d;
         return `<tr><td>${i + 1}</td><td>${KIND_META[b.kind].badge}</td>
-            <td>${esc(b.kind === "sync" ? b.speaker || "—" : "")}</td>
+            <td>${esc(TITR_KINDS.has(b.kind) ? b.speaker || "—" : "")}</td>
             <td>${esc((b.text || "").replace(/\s+/g, " ").slice(0, 90))}</td>
             <td style="text-align:right;font-family:var(--mono);color:var(--text)">${mmss(d)}</td></tr>`;
     }).join("");
@@ -640,7 +640,7 @@ const PJ_ITEMS = [
     { sep: true },
     { act: "fish", lbl: "🐟 В рыбособиратель", title: "CSV «;» — файлы и таймкоды для сборки сюжета в Fish Cutter", fn: () => exportCsv(";") },
     { act: "xls",  lbl: "📊 CSV для Excel «,»", title: "Тот же CSV с запятой — для открытия в Excel", fn: () => exportCsv(",") },
-    { act: "mog",  lbl: "🎬 MOGRT титры",     title: "CSV: имя/фамилия/отчество, должность и вход — для lower third шаблонов MOGRT", fn: () => exportMogrt(";") },
+    { act: "mog",  lbl: "🎬 MOGRT титры",     title: "CSV: титры синхронов и стендапов (ФИО по колонкам, должность, вход) — для lower third шаблонов MOGRT", fn: () => exportMogrt(";") },
 ];
 function closeProjMenu() { const m = $("projMenu"); if (m) m.remove(); $("gnProject").classList.remove("active"); }
 $("gnProject").onclick = e => {
