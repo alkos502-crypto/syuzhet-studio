@@ -533,14 +533,14 @@ function renderSources() {
     $("ocSources").innerHTML = used.size ? [...used.entries()].map(([path, u]) =>
         `<div class="src-item" data-src="${esc(path)}"><span class="src-name" title="${esc(path)}">${esc(u.name)}</span>
          <span class="src-n">${u.n} фр.</span><span class="mi-dur">${mmss(u.dur)}</span></div>`).join("")
-        : '<p class="muted">Фрагменты ещё не размечены. Откройте папку с исходниками (меню «Проект» → «Папка исходников…»), отметьте In/Out в мониторе и вставьте фрагмент в блок.</p>';
+        : '<p class="muted">Фрагменты ещё не размечены. Откройте папку с исходниками (кнопка «📁 Исходники» в шапке сюжета), отметьте In/Out в мониторе и вставьте фрагмент в блок.</p>';
     $("ocSources").querySelectorAll("[data-src]").forEach(el => el.onclick = () => {
         const path = el.dataset.src;
         switchMediaTab("media");
         let vf = videoFiles.find(v => v.relPath === path);
         if (!vf) vf = videoFiles.find(v => v.name === path.split("/").pop());
         if (vf) loadVideo(vf);
-        else toast("Папка с исходниками не выбрана или файл недоступен — Проект → «Папка исходников…»", "warn");
+        else toast("Папка с исходниками не выбрана или файл недоступен — «📁 Исходники» в шапке сюжета", "warn");
     });
 }
 function renderSocial() {
@@ -633,7 +633,6 @@ const PJ_ITEMS = [
     { act: "open", lbl: "📂 Открыть…",       title: "Загрузить черновик из файла .json — вернутся блоки, реквизиты и fps", fn: () => loadDraft() },
     { act: "save", lbl: "💾 Сохранить…",     title: "Сохранить текущий сюжет в файл-черновик .json и продолжить позже", fn: () => saveDraft() },
     { sep: true },
-    { act: "dir",  lbl: "📁 Папка исходников…", title: "Выбрать папку с видеофайлами (можно по сети) — Chrome/Edge запомнят её и ⟳ откроет без выбора", fn: () => pickFolder() },
     { sep: true },
     { act: "wimp", lbl: "📥 Импорт из Word…", title: "Вернуть правки редактора из его Word-файла (.doc/.docx/.txt), обзор «было/стало»", fn: () => importWord() },
     { act: "wexp", lbl: "📤 Экспорт в Word",  title: "Текст сценария без файлов и таймкодов — для редактора", fn: () => exportWord() },
@@ -664,7 +663,7 @@ $("gnProject").onclick = e => {
     }), 0);
 };
 document.addEventListener("keydown", e => {
-    if (e.key === "Escape") { closeProjMenu(); closeStoriesMenu(); if (!$("keysModal").hidden) closeKeys(); if (!$("cmdPalette").hidden) cpClose(); }
+    if (e.key === "Escape") { closeProjMenu(); closeStoriesMenu(); if (!$("keysModal").hidden) closeKeys(); if (!$("cmdPalette").hidden) cpClose(); if (!$("setupModal").hidden) closeSetup(); }
     /* «?» вне полей ввода — шпаргалка горячих клавиш */
     if (e.key === "?" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const t = e.target;
@@ -695,6 +694,8 @@ function cpItems() {
     });
     PJ_ITEMS.forEach(it => { if (!it.sep) items.push({ g: "Команда", t: it.lbl, h: it.title, run: it.fn }); });
     items.push({ g: "Команда", t: "🔍 Поиск по сюжету", h: "Ctrl+F", run: () => openSearch() });
+    items.push({ g: "Команда", t: "📁 Папка исходников…", h: "выбор или повторное открытие (⟳)", run: folderAction });
+    items.push({ g: "Команда", t: "⚙ Настройки сюжета", h: "FPS и темп чтеца", run: openSetup });
     items.push({ g: "Команда", t: "⤡ Свернуть / развернуть все блоки", h: null, run: () => $("btnFoldAll").click() });
     items.push({ g: "Команда", t: "⌨ Горячие клавиши", h: "?", run: openKeys });
     return items;
@@ -745,6 +746,18 @@ document.addEventListener("keydown", e => {
         $("cmdPalette").hidden ? cpOpen() : cpClose();
     }
 });
+
+/* ---------- шапка сюжета: папка исходников и настройки (N1/N2) ---------- */
+function folderAction() {
+    if (dirHandle) openDirHandle(); else pickFolder();   /* тот же путь, что у ⟳ в Media Browser */
+}
+$("btnFolderHead").onclick = folderAction;
+function openSetup() { $("setupModal").hidden = false; $("fpsInput").focus(); $("fpsInput").select(); }
+function closeSetup() { $("setupModal").hidden = true; }
+$("btnStorySetup").onclick = openSetup;
+$("smClose").onclick = closeSetup;
+$("smOk").onclick = closeSetup;
+$("setupModal").addEventListener("click", e => { if (e.target === $("setupModal")) closeSetup(); });
 
 /* ---------- старт ---------- */
 window.addEventListener("beforeunload", () => { clearTimeout(ocFlushT); ocFlushNow(); });

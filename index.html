@@ -46,28 +46,22 @@
             <div class="nf-row">
                 <label>REP</label>
                 <select id="fioReporter" data-role="корреспондента" title="Корреспондент сюжета"></select>
-                <button class="nf-gear" data-names="fioReporter" title="Изменить и удалить имена" aria-label="Управление списками имён"<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/></svg></button>
+                <button class="nf-gear" data-names="fioReporter" title="Изменить и удалить имена" aria-label="Управление списками имён"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/></svg></button>
             </div>
             <div class="nf-row">
                 <label>CAM</label>
                 <select id="fioCam" data-role="оператора" title="Оператор сюжета"></select>
-                <button class="nf-gear" data-names="fioCam" title="Изменить и удалить имена" aria-label="Управление списками имён"<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/></svg></button>
+                <button class="nf-gear" data-names="fioCam" title="Изменить и удалить имена" aria-label="Управление списками имён"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/></svg></button>
             </div>
             <div class="nf-row">
                 <label>EDIT</label>
                 <select id="fioEditor" data-role="монтажёра" title="Монтажёр сюжета"></select>
-                <button class="nf-gear" data-names="fioEditor" title="Изменить и удалить имена" aria-label="Управление списками имён"<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/></svg></button>
+                <button class="nf-gear" data-names="fioEditor" title="Изменить и удалить имена" aria-label="Управление списками имён"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/></svg></button>
             </div>
-            <div class="nf-row">
-                <label>FPS</label>
-                <input id="fpsInput" type="number" min="1" max="240" step="any" value="25" class="sh-num"
-                     title="Частота кадров проекта. 25 / 29.97 / 50… — должна совпадать с секвенцией в Premiere">
-            </div>
-            <div class="nf-row">
-                <label>PACE</label>
-                <input id="readSpeed" type="number" min="60" max="2400" step="10" value="540" class="sh-num"
-                     title="Темп чтеца, зн/мин — для оценки хронометража текстовых блоков (HEADLINE, LEAD, VO) без фрагментов. 540 ≈ телеграфный темп">
-            </div>
+            <button id="btnFolderHead" title="Папка исходников: выбрать или повторно открыть сохранённую (без повторного выбора)">
+                📁 Исходники <span id="folderName" class="mv-dir muted"></span>
+            </button>
+            <button id="btnStorySetup" class="ib" title="Настройки сюжета: FPS и темп чтеца" aria-label="Настройки сюжета"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8"/></svg></button>
             <span class="spacer"></span>
             <div class="sh-actions">
                 <input type="file" id="draftFile" accept=".json" hidden>
@@ -227,7 +221,6 @@
         <section class="panel-sec" data-panel="browser">
             <div class="panel-head">
                 <span class="ph-title">Media Browser (<b id="ocVidCount">0</b>)</span>
-                <span id="folderName" class="mv-dir muted" title="Source folder — Project → «Папка исходников…»; ⟳ reloads it without re-picking"></span>
                 <span class="spacer"></span>
                 <span class="view-toggle">
                     <button id="viewList" title="Списком" aria-label="Вид: списком">
@@ -364,6 +357,32 @@
     </div>
 </div>
 
+<!-- ====== настройки сюжета: FPS и темп чтеца ====== -->
+<div id="setupModal" class="modal" hidden>
+    <div class="modal-box ask-box">
+        <div class="modal-head">
+            <h2>Настройки сюжета</h2>
+            <button id="smClose" class="icon-x" title="Закрыть (Esc)" aria-label="Закрыть"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        </div>
+        <div class="row setup-row">
+            <label for="fpsInput">FPS</label>
+            <input id="fpsInput" type="number" min="1" max="240" step="any" value="25" class="sh-num"
+                   title="Частота кадров проекта. 25 / 29.97 / 50… — должна совпадать с секвенцией в Premiere">
+            <span class="muted">кадр/с — таймкоды и экспорты</span>
+        </div>
+        <div class="row setup-row">
+            <label for="readSpeed">PACE</label>
+            <input id="readSpeed" type="number" min="60" max="2400" step="10" value="540" class="sh-num"
+                   title="Темп чтеца, зн/мин — для оценки хронометража текстовых блоков (HEADLINE, LEAD, VO) без фрагментов. 540 ≈ телеграфный темп">
+            <span class="muted">зн/мин — оценка хроно текстовых блоков</span>
+        </div>
+        <div class="row ask-row">
+            <span class="spacer"></span>
+            <button id="smOk" class="accent">Готово</button>
+        </div>
+    </div>
+</div>
+
 <!-- ====== шпаргалка горячих клавиш («?» / кнопка справки) ====== -->
 <div id="keysModal" class="modal" hidden>
     <div class="modal-box keys-box">
@@ -412,8 +431,8 @@
                 <dl>
                     <div><dt><kbd>?</kbd></dt><dd>эта шпаргалка</dd></div>
                     <div><dt><kbd>ПКМ</kbd> по сюжету в «Сюжеты…»</dt><dd>дублировать / удалить</dd></div>
-                    <div><dt>«Проект» → Сохранить…</dt><dd>черновик .json (блоки + реквизиты)</dd></div>
-                    <div><dt>⟳ в Медиабраузере</dt><dd>перечитать папку исходников</dd></div>
+                    <div><dt>Project → Сохранить…</dt><dd>черновик .json (блоки + реквизиты)</dd></div>
+                    <div><dt>📁 «Исходники» в шапке / ⟳ в Media Browser</dt><dd>выбрать или перечитать папку без повторного выбора</dd></div>
                 </dl>
             </section>
         </div>

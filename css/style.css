@@ -156,6 +156,16 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .sh-actions { display: flex; gap: 4px; align-items: center; }
 .sh-actions button { font-size: 11px; padding: 3px 8px; }
 .sh-actions select { width: auto; font-size: 11px; padding: 2px 4px; }
+#btnFolderHead {
+    display: inline-flex; align-items: center; gap: 6px; max-width: 360px;
+    font-size: 11px; padding: 3px 10px; background: var(--ctl);
+}
+#btnFolderHead:hover { background: var(--ctl-h); }
+#btnFolderHead #folderName { color: var(--text3); flex: 0 1 auto; max-width: 240px; font-size: 11px; }
+#btnStorySetup { padding: 3px 6px; }
+.setup-row { margin: 12px 0 0; gap: 8px; }
+.setup-row label { margin: 0; flex: 0 0 auto; }
+.setup-row .sh-num { width: 110px; font-size: 13px; padding: 4px 8px; text-align: left; }
 
 /* ---- центральная прокрутка ---- */
 #centerScroll { flex: 1; min-height: 0; overflow-y: auto; }

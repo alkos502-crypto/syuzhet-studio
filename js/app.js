@@ -566,7 +566,7 @@ async function restoreDirHandle() {
         if (h && h.kind === "directory") {
             dirHandle = h;
             if (!$("folderName").textContent)
-                $("folderName").textContent = "«" + h.name + "» — ⟳ откроет без выбора папки";
+                $("folderName").textContent = "«" + h.name + "»";
         }
     } catch (e) {}
 }
@@ -1462,7 +1462,7 @@ function renderBlocks() {
                 <textarea class="doc-text" rows="1" placeholder="${ph}" aria-label="Текст блока">${esc(b.text)}</textarea>
                 ${PART_KINDS.has(b.kind) ? `<div class="doc-parts"></div>` : ""}
             </div>
-            <span class="doc-dur" title="${est ? "Оценка по длине текста (~" + Math.round(readCps()) + " зн/с, темп задаётся в шапке сюжета)" : "Сумма таймкодов фрагментов"}">${est ? "~" : ""}${durTc(dur)}</span>
+            <span class="doc-dur" title="${est ? "Оценка по длине текста (~" + Math.round(readCps()) + " зн/с, темп — в ⚙ настройках сюжета)" : "Сумма таймкодов фрагментов"}">${est ? "~" : ""}${durTc(dur)}</span>
             <div class="doc-tools">
                 ${cN ? `<button data-act="cmts" title="${cN} комм. к блоку" aria-label="Комментарии блока">${icon("bubble",12)}${cN}</button>` : ""}
                 ${PART_KINDS.has(b.kind) ? `
@@ -1640,7 +1640,7 @@ $("btnSend").addEventListener("click", () => {
 
 /* ---------- горячие клавиши плеера ---------- */
 document.addEventListener("keydown", e => {
-    if (!$("askModal").hidden) return;   /* открытый вопрос перехватывает клавиши сам */
+    if (!$("askModal").hidden || !$("setupModal").hidden) return;   /* модалки перехватывают клавиши сами */
     const mod = e.ctrlKey || e.metaKey;
     if (e.key === "Escape") {
         if (!$("findBar").hidden) { closeSearch(); return; }
@@ -2357,7 +2357,7 @@ if (!loadDraftData({ blocks: store.get("ss_blocks", []), nextId: store.get("ss_n
     renderBlocks();
 const savedDir = store.get("ss_dirname", "");
 if (savedDir)
-    $("folderName").textContent = `«${savedDir}» — ⟳ откроет без выбора (или Проект → «Папка исходников…»)`;
+    $("folderName").textContent = `«${savedDir}»`;
 restoreDirHandle();
 $("quotaSave").onclick = () => saveDraft();
 $("quotaDump").onclick = async () => {      /* диагностика + аварийный снимок — открыть/прислать для разбора */
