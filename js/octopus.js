@@ -501,11 +501,11 @@ function renderApproval() {
             <span>Файлы и таймкоды для сборки сюжета (CSV «;», есть вариант для Excel в меню «Проект»)</span></span>
             <button class="accent" data-ap="csv">Экспорт</button></div>
         <div class="ap-row"><span class="ap-num">4</span><span class="ap-main"><b>MOGRT титры</b>
-            <span>Фамилии/должности спикеров и репортёров и таймкоды для lower third шаблонов</span></span>
+            <span>Двухколоночный CSV «Имя Фамилия;Должность» — для плагина Lower Thirds Generator (расстановка плашек маркерами или подряд)</span></span>
             <button data-ap="mogrt">Экспорт</button></div>
     </div>`;
     const act = { doc: exportWord, imp: importWord,
-                  csv: () => exportCsv(";"), mogrt: () => exportMogrt(";") };
+                  csv: () => exportCsv(";"), mogrt: () => exportMogrt() };
     $("ocApproval").querySelectorAll("[data-ap]").forEach(b => b.onclick = act[b.dataset.ap]);
 }
 
@@ -642,7 +642,7 @@ const PJ_ITEMS = [
     { sep: true },
     { act: "fish", lbl: "🐟 В рыбособиратель", title: "CSV «;» — файлы и таймкоды для сборки сюжета в Fish Cutter", fn: () => exportCsv(";") },
     { act: "xls",  lbl: "📊 CSV для Excel «,»", title: "Тот же CSV с запятой — для открытия в Excel", fn: () => exportCsv(",") },
-    { act: "mog",  lbl: "🎬 MOGRT титры",     title: "CSV: титры синхронов и стендапов (ФИО по колонкам, должность, вход) — для lower third шаблонов MOGRT", fn: () => exportMogrt(";") },
+    { act: "mog",  lbl: "🎬 MOGRT титры",     title: "CSV «Имя Фамилия;Должность» (капсом) — для плагина Premiere Lower Thirds Generator", fn: () => exportMogrt() },
 ];
 function closeProjMenu() { const m = $("projMenu"); if (m) m.remove(); $("gnProject").classList.remove("active"); }
 $("gnProject").onclick = e => {

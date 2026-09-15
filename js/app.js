@@ -1949,49 +1949,27 @@ function exportWord() {
 /* ---------- экспорт: нижние титры для MOGRT (CSV по всем синхронам) ---------- */
 /* «Имя Фамилия [Отчество]» -> {last, first, mid}: 1-е слово — имя,
    2-е — фамилия, остальные — отчество (подстраховка — колонка «спикер целиком») */
-function parseFio(s) {
-    const w = normWs(s).split(" ").filter(Boolean);
-    return { last: w[1] || "", first: w[0] || "", mid: w.slice(2).join(" ") };
-}
-function buildMogrtCsv(sep) {
-    const cell = s => {
-        s = String(s ?? "");
-        return (s.includes(sep) || /["\n\r]/.test(s)) ? '"' + s.replace(/"/g, '""') + '"' : s;
+/* ---------- MOGRT: формат плагина LowerThirdsGenerator ( Premiere UXP ) ----------
+   Две колонки; заголовок «Имя Фамилия;Должность»; порядок = появления титров в
+   сценарии (SOT и STANDUP с непустым именем). Плагин сам ищет колонки по
+   заголовку, таймкоды не читает (расстановка — маркеры секвенции или подряд). */
+function buildMogrtCsv() {
+    const cell = x => {
+        x = String(x ?? "");
+        return /[";\n\r]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x;
     };
-    const row = (...cols) => cols.map(cell).join(sep === ";" ? "; " : sep);
-    const L = [];
-    L.push("# MOGRT — нижние титры, собрано в «Сюжет-Студии»");
-    L.push("# Сюжет: " + ($("storyTitle").value || "—"));
-    L.push("# Таймкод: NDF " + fpsVal() + " к/с; Дата: " + new Date().toISOString().slice(0, 10));
-    L.push("# Порядок = появление титров в сценарии (сначала синхроны, затем стендапы); «вход» = таймкод первого фрагмента (момент появления плашки)");
-    L.push("#");
-    L.push(row("№", "фамилия", "имя", "отчество", "должность", "вход", "спикер целиком", "файл входа", "путь"));
-    let syN = 0;
+    const L = ["Имя Фамилия;Должность"];
     state.blocks.forEach(b => {
-        if (b.kind !== "sync") return;
-        syN++;
-        const f = parseFio(b.speaker);
-        const p0 = b.parts[0];
-        L.push(row(syN, f.last, f.first, f.mid, b.role || "",
-                   p0 ? tc(p0.in) : "", b.speaker || "",
-                   p0 ? p0.file : "", p0 ? (p0.path || p0.file) : ""));
-    });
-    state.blocks.forEach(b => {
-        if (b.kind !== "standup" || !b.speaker) return;
-        syN++;
-        const f = parseFio(b.speaker);
-        const p0 = b.parts[0];
-        L.push(row(syN, f.last, f.first, f.mid, b.role || "",
-                   p0 ? tc(p0.in) : "", b.speaker,
-                   p0 ? p0.file : "", p0 ? (p0.path || p0.file) : ""));
+        if (!TITR_KINDS.has(b.kind) || !b.speaker) return;
+        L.push(cell(b.speaker.toUpperCase()) + ";" + cell((b.role || "").toUpperCase()));
     });
     return "\uFEFF" + L.join("\r\n");
 }
-function exportMogrt(sep) {
-    const n = state.blocks.filter(b => b.kind === "sync" || (b.kind === "standup" && b.speaker)).length;
-    if (!n) return toast("В сценарии нет титров (синхронов или стендапов с ФИО)", "err");
-    download(slug($("storyTitle").value) + "_mogrt.csv", buildMogrtCsv(sep), "text/csv;charset=utf-8");
-    toast("Файл титров для MOGRT сохранён (плашек: " + n + ")", "ok");
+function exportMogrt() {
+    const n = state.blocks.filter(b => TITR_KINDS.has(b.kind) && b.speaker).length;
+    if (!n) return toast("Нет титров: заполните имя в блоках SOT или STANDUP", "err");
+    download(slug($("storyTitle").value) + "_mogrt.csv", buildMogrtCsv(), "text/csv;charset=utf-8");
+    toast("Титры для Lower Thirds Generator сохранены (строк: " + n + ")", "ok");
 }
 
 /* ---------- черновик JSON + автосохранение ---------- */
