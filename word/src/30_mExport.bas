@@ -110,44 +110,34 @@ Private Function Dash(ByVal s As String) As String
     If Len(s) = 0 Then Dash = "—" Else Dash = s
 End Function
 
-' MOGRT: разбор ФИО как parseFio в студии («Имя Фамилия [Отчество]»)
+Private Sub MogrtSpeaker(doc As Document, b As Blk, ByRef spk As String, ByRef role As String)
+    spk = b.speaker
+    role = b.role
+    If b.kind <> "standup" Or Len(spk) > 0 Then Exit Sub
+    Dim h As String, kind As String, num As Long
+    h = doc.Paragraphs(b.headIdx).Range.Text
+    h = NormSp(Left$(h, Len(h) - 1))
+    If StartsWith(LCase$(h), "стендап") Then
+        h = "Синхрон" & Mid$(h, Len("стендап") + 1)
+    ElseIf StartsWith(LCase$(h), "standup") Then
+        h = "Синхрон" & Mid$(h, Len("standup") + 1)
+    Else
+        Exit Sub
+    End If
+    Call ClassifyHead(h, kind, num, spk, role)
+End Sub
+
 Public Function BuildMogrt(doc As Document, ByVal sep As String) As String
+    If sep <> ";" Then Err.Raise 5, "BuildMogrt", "MOGRT requires semicolon delimiter"
     Scan doc
     Dim L As New Collection
-    Dim dt As String
-    If Len(ExportDateOverride) > 0 Then dt = ExportDateOverride Else dt = Format(Now, "yyyy-mm-dd")
-    AddL L, "# MOGRT — нижние титры, собрано в «Сюжет-Word»"
-    AddL L, "# Сюжет: " & IIf(Len(Ttl) > 0, Ttl, "—")
-    AddL L, "# Таймкод: NDF " & IIf(Len(FpsS) > 0, FpsS, "25") & " к/с; Дата: " & dt
-    AddL L, "# Порядок = появление синхронов в сценарии; «вход» = таймкод первого фрагмента"
-    AddL L, "#"
-    AddL L, Cel("№", sep) & SepJoin(sep) & Cel("фамилия", sep) & SepJoin(sep) & _
-            Cel("имя", sep) & SepJoin(sep) & Cel("отчество", sep) & SepJoin(sep) & _
-            Cel("должность", sep) & SepJoin(sep) & Cel("вход", sep) & SepJoin(sep) & _
-            Cel("спикер целиком", sep) & SepJoin(sep) & Cel("файл входа", sep) & _
-            SepJoin(sep) & Cel("путь", sep)
-    Dim i As Long, b As Blk, w As Variant
+    AddL L, "Имя Фамилия;Должность"
+    Dim i As Long, b As Blk, spk As String, role As String
     For i = 0 To NBlk - 1
         b = BlkArr(i)
-        If b.kind = "sync" Then
-            w = SplitParts(NormSp(b.speaker), " ")
-            Dim lastN As String, firstN As String, midN As String, j As Long
-            firstN = "": lastN = "": midN = ""
-            If UBound(w) >= 0 Then firstN = CStr(w(0))
-            If UBound(w) >= 1 Then lastN = CStr(w(1))
-            For j = 2 To UBound(w)
-                If Len(midN) > 0 Then midN = midN & " "
-                midN = midN & CStr(w(j))
-            Next j
-            Dim tin0 As String, file0 As String, path0 As String
-            If b.nFrag > 0 Then
-                tin0 = b.frags(0).tin: file0 = b.frags(0).file: path0 = b.frags(0).path
-            Else
-                tin0 = "": file0 = "": path0 = ""
-            End If
-            AddL L, Rw(sep, CStr(b.num), lastN, firstN, midN, b.role) _
-                    & SepJoin(sep) & Cel(tin0, sep) & SepJoin(sep) & Cel(b.speaker, sep) _
-                    & SepJoin(sep) & Cel(file0, sep) & SepJoin(sep) & Cel(path0, sep)
+        If b.kind = "sync" Or b.kind = "standup" Then
+            MogrtSpeaker doc, b, spk, role
+            If Len(spk) > 0 Then AddL L, Cel(UCase$(spk), ";") & ";" & Cel(UCase$(role), ";")
         End If
     Next i
     BuildMogrt = JoinColl(L, vbCrLf)

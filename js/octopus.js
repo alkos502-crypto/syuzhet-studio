@@ -82,69 +82,174 @@ function seedStories() {
     return list;
 }
 
-/* ---------- хранение сюжетов: IndexedDB (localStorage ~5 МБ забивается быстро) ----------
-   SS_IDB_OK ставит ocInit; при его отсутствии — тихий возврат к localStorage.
-   Записи в IDB идут последовательно (цепочка промисов), данные всегда полный снимок.
-   До конца ocInit (проба IDB) записи буферизуются — иначе гонка напишет мегабайты
-   в localStorage, который миграция как раз собирается освободить. */
 window.SS_IDB_OK = false;
-let ocInitDone = false, ocPersistPending = false;
+let ocInitDone = false, ocBaseRev = null, ocQueuedRev = null;
+let ocGeneration = 0, ocSavedGeneration = -1, ocPending = 0, ocSequence = 0;
+let ocStorageError = "", ocLegacyKeys = null;
+const ocTabId = Date.now().toString(36) + "-" + Array.from(crypto.getRandomValues(new Uint32Array(4)), n => n.toString(36)).join("-");
+const ocRecoveryKey = "oc_recovery_" + ocTabId;
 let idbWriteChain = Promise.resolve();
+function ocSnapshot() {
+    return JSON.parse(JSON.stringify({ stories: OC.stories, activeId: OC.activeId }));
+}
+function ocRecovery(snapshot, baseRev, reason) {
+    const envelope = { version: 1, tabId: ocTabId, timestamp: new Date().toISOString(), baseRev, reason, snapshot };
+    let stored = false;
+    try { localStorage.setItem(ocRecoveryKey, JSON.stringify(envelope)); stored = true; } catch (e) {}
+    const status = stored ? "Только recovery-копия в этой вкладке" : "Не сохранено: recovery недоступна";
+    const el = $("sbSaved");
+    if (el) { el.textContent = status; el.classList.add("dirty"); }
+    quotaWarn(reason + ". " + status + ". Сохраните черновик/снимок, перезагрузите и выберите версию.");
+    return stored;
+}
 function persistStories() {
-    if (!ocInitDone) { ocPersistPending = true; return; }
-    if (window.SS_IDB_OK) {
-        idbWriteChain = idbWriteChain
-            .then(() => IDB.put("kv", "oc_stories", OC.stories))
-            .then(() => IDB.put("kv", "oc_active", OC.activeId))
-            .catch(e => {
-                console.error("IDB stories save failed:", e);
-                window.SS_IDB_OK = false;            /* дальше — через localStorage, как раньше */
-                quotaWarn("IndexedDB: " + ((e && e.name) || e));
-                persistStories();
-            });
-    } else {
-        store.set("oc_stories", OC.stories);
-        store.set("oc_active", OC.activeId);
-    }
+    if (!ocInitDone) return Promise.resolve(false);
+    sbDirty();
+    const generation = ocGeneration, snapshot = ocSnapshot(), baseRev = ocQueuedRev;
+    snapshot.rev = ocTabId + ":" + (++ocSequence);
+    snapshot.timestamp = new Date().toISOString();
+    ocQueuedRev = snapshot.rev;
+    ocPending++;
+    const write = idbWriteChain.then(async () => {
+        if (!window.SS_IDB_OK || ocStorageError) {
+            ocRecovery(snapshot, ocBaseRev, ocStorageError || "IndexedDB недоступен");
+            return false;
+        }
+        try {
+            await IDB.compareSnapshot(baseRev, snapshot);
+            ocBaseRev = snapshot.rev;
+            clearHeavyLsKeys();
+            return true;
+        } catch (e) {
+            ocStorageError = e.name === "ConflictError" ? "Конфликт: сюжеты изменены другой вкладкой" : "Ошибка IndexedDB: " + (e.name || e);
+            window.SS_IDB_OK = false;
+            ocRecovery(snapshot, baseRev, ocStorageError);
+            return false;
+        }
+    }).finally(() => { ocPending--; });
+    idbWriteChain = write.then(ok => {
+        if (ok && generation === ocGeneration && !ocPending) {
+            ocSavedGeneration = generation;
+            sbSaved(nowHM());
+        }
+        return ok;
+    });
+    return idbWriteChain;
 }
 function clearHeavyLsKeys() {
-    window.SS_LS_MIGRATED = true;                  /* saveState больше не плодит легаси-дубли */
-    ["oc_stories", "oc_active", "ss_blocks", "ss_nextId"].forEach(k => {
-        try { localStorage.removeItem(k); } catch (e) {}
+    if (!ocLegacyKeys) return;
+    try {
+        if (!Object.entries(ocLegacyKeys).every(([k, v]) => localStorage.getItem(k) === v)) return;
+        Object.keys(ocLegacyKeys).forEach(k => localStorage.removeItem(k));
+        window.SS_LS_MIGRATED = true;
+        ocLegacyKeys = null;
+    } catch (e) {}
+}
+function ocReadReq() {
+    const req = {};
+    REQ_IDS.forEach(id => { req[id] = $(id).value === "+" ? ((active().req || {})[id] || "") : $(id).value; });
+    return req;
+}
+function ocValidSnapshot(value) {
+    return value && Array.isArray(value.stories) && value.stories.length &&
+        value.stories.every(s => s && Number.isFinite(s.id) && Array.isArray(s.blocks));
+}
+function ocReadRecovery() {
+    const copies = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key.startsWith("oc_recovery_")) continue;
+        const raw = localStorage.getItem(key);
+        try {
+            const value = JSON.parse(raw);
+            if (!ocValidSnapshot(value.snapshot)) throw new Error("Некорректная recovery-копия");
+            copies.push({ key, ...value });
+        } catch (e) { copies.push({ key, raw, error: String(e) }); }
+    }
+    return copies;
+}
+function ocChooseSnapshot(candidates, recovery) {
+    return new Promise(resolve => {
+        const panel = document.createElement("div");
+        panel.className = "modal";
+        panel.setAttribute("role", "dialog");
+        panel.setAttribute("aria-label", "Восстановление сюжетов");
+        const box = document.createElement("div");
+        box.className = "modal-box";
+        const text = document.createElement("p");
+        text.textContent = "Найдены версии сюжетов. Выберите, какую открыть. Обе версии остаются в хранилище; перед продолжением сохраните общий снимок. Автоматического объединения нет.";
+        const select = document.createElement("select");
+        candidates.forEach((c, i) => {
+            const option = document.createElement("option");
+            option.value = String(i);
+            option.textContent = c.label + " — " + c.snapshot.stories.map(s => s.title || s.id).join(", ");
+            select.appendChild(option);
+        });
+        const dump = document.createElement("button");
+        dump.textContent = "Сохранить все версии";
+        dump.onclick = () => download("ss-recovery-snapshots.json", JSON.stringify({ candidates, recovery }, null, 1), "application/json");
+        const open = document.createElement("button");
+        open.textContent = "Открыть выбранную версию";
+        open.onclick = () => { panel.remove(); resolve(candidates[Number(select.value)]); };
+        box.append(text, select, dump, open);
+        panel.appendChild(box);
+        document.body.appendChild(panel);
+        panel.addEventListener("keydown", e => { trapTab(box, e); e.stopPropagation(); });
+        select.focus();
     });
 }
 function active() { return OC.stories.find(s => s.id === OC.activeId) || OC.stories[0]; }
 
 /* ---------- переключение / сохранение активного сюжета ---------- */
-function loadStory(id) {
+function loadStory(id, persist = true) {
     const st = OC.stories.find(s => s.id === id);
     if (!st) return;
-    if (st.id !== OC.activeId) ocFlushNow();          /* довесохранить предыдущий */
+    clearTimeout(ocFlushT);
+    ocFlushT = 0;
+    if (st.id !== OC.activeId) ocFlushNow();
     OC.activeId = st.id;
-    /* реквизиты (fps, темп, ФИО) — свои у каждого сюжета */
-    if (st.req && typeof st.req === "object") { store.set("ss_req", st.req); loadReq(); }
+    const req = Object.assign({ storyTitle: st.title, fpsInput: "25", readSpeed: "540",
+        fioReporter: "", fioCam: "", fioEditor: "" }, st.req || {});
+    store.set("ss_req", req);
+    loadReq();
+    REQ_IDS.forEach(k => {
+        const el = $(k), value = req[k] || "";
+        if (NAME_IDS.includes(k) && value && !Array.from(el.options).some(o => o.value === value)) {
+            const option = document.createElement("option");
+            option.value = option.textContent = value;
+            el.appendChild(option);
+        }
+        el.value = value;
+    });
     state.blocks = normalizeBlocks(st.blocks);
     const maxId = Math.max(0, ...state.blocks.map(b => b.id));
     state.nextId = Math.max(st.nextId || 1, maxId + 1);
     $("storyTitle").value = st.title;
     undoStack.length = 0; redoStack.length = 0;
     currentBlockId = null; $("curBlock").textContent = "";
-    persistStories();
+    if (persist) persistStories();
     renderBlocks();
 }
 
 let ocFlushT = 0;
 function ocFlushNow() {
+    clearTimeout(ocFlushT);
+    ocFlushT = 0;
+    if (!ocInitDone) return;
     const st = active(); if (!st) return;
     st.blocks = JSON.parse(JSON.stringify(state.blocks));
     st.nextId = state.nextId;
     st.title = $("storyTitle").value.trim();
-    st.req = store.get("ss_req", {});
+    st.req = ocReadReq();
+    store.set("ss_req", st.req);
     st.modified = nowHM();
-    persistStories();
-    sbSaved(st.modified);
+    return persistStories();
 }
-function ocFlushSoon() { clearTimeout(ocFlushT); ocFlushT = setTimeout(ocFlushNow, 400); }
+function ocFlushSoon() {
+    if (!ocInitDone) return;
+    clearTimeout(ocFlushT);
+    ocFlushT = setTimeout(ocFlushNow, 400);
+}
 
 /* ---------- управление сюжетами (из меню «Проект») ---------- */
 function deleteStory(id) {
@@ -232,10 +337,10 @@ function renderHead() {
     $("ocStoryId").textContent = String(st.id).padStart(8, "0");
     $("ocModified").textContent = st.modified || "—";
     $("sbFps").textContent = $("fpsInput").value || "—";
-    sbSaved(st.modified);
 }
 /* ---------- статус-бар: сохранение / FPS ---------- */
 function sbDirty() {
+    ocGeneration++;
     const e = $("sbSaved");
     if (e) { e.textContent = "…unsaved"; e.classList.add("dirty"); }
 }
@@ -244,8 +349,17 @@ function sbSaved(time) {
     if (e) { e.textContent = "✓ " + (time || nowHM()) + " saved"; e.classList.remove("dirty"); }
 }
 $("fpsInput").addEventListener("input", () => { $("sbFps").textContent = $("fpsInput").value || "—"; });
-$("storyTitle").addEventListener("input", () => { sbDirty(); ocFlushSoon(); });
-$("storyTitle").addEventListener("change", () => { ocFlushNow(); renderHead(); });
+REQ_IDS.forEach(id => {
+    $(id).addEventListener("input", () => { if (ocInitDone) { sbDirty(); ocFlushSoon(); } });
+    $(id).addEventListener("change", () => { if (ocInitDone) ocFlushNow(); });
+});
+document.addEventListener("keydown", e => {
+    if (window.SS_STORAGE_LOADING && !e.target.closest(".modal")) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+    }
+}, true);
+$("storyTitle").addEventListener("change", () => { renderHead(); });
 
 /* ---------- вкладки центра ---------- */
 let centerTab = "script";
@@ -574,6 +688,7 @@ function ocRefreshAll() {
 }
 
 /* ---------- точки расширения движка (app.js) — без переназначения его функций ---------- */
+SS_HOOK.afterDuration = () => { renderTotal(); };
 SS_HOOK.afterRender = () => { ocRefreshAll(); updateUsedDots(); };
 SS_HOOK.afterSave = () => { sbDirty(); ocFlushSoon(); };
 SS_HOOK.afterVideoList = () => { $("ocVidCount").textContent = videoFiles.length; };
@@ -762,31 +877,94 @@ $("smOk").onclick = closeSetup;
 $("setupModal").addEventListener("click", e => { if (e.target === $("setupModal")) closeSetup(); });
 
 /* ---------- старт ---------- */
-window.addEventListener("beforeunload", () => { clearTimeout(ocFlushT); ocFlushNow(); });
-document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(ocFlushT); ocFlushNow(); } });
-(async function ocInit() {
-    if (!localStorage.getItem("ss_view")) setView("thumbs-big");
-    /* есть ли рабочий IndexedDB (приватный режим Safari/Firefox умеет отказать) */
-    try { await IDB.put("kv", "_probe", 1); await IDB.del("kv", "_probe"); window.SS_IDB_OK = true; }
-    catch (e) { console.warn("IndexedDB недоступен, остаёмся на localStorage:", e && e.name); }
-    let list = null, aid = null;
-    if (window.SS_IDB_OK) { list = await IDB.get("kv", "oc_stories"); aid = await IDB.get("kv", "oc_active"); }
-    if (!Array.isArray(list) || !list.length) {
-        const legacy = store.get("oc_stories", null);          /* первый запуск после обновления — мигрируем из localStorage */
-        if (Array.isArray(legacy) && legacy.length) {
-            list = legacy;
-            if (aid == null) aid = store.get("oc_active", null);
+window.addEventListener("beforeunload", e => {
+    if (ocInitDone && (ocPending || ocFlushT || ocSavedGeneration !== ocGeneration)) {
+        ocFlushNow();
+        ocRecovery(ocSnapshot(), ocBaseRev, "Закрытие вкладки до подтверждённого сохранения");
+        e.preventDefault();
+        e.returnValue = "";
+    }
+});
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden && ocInitDone && ocSavedGeneration !== ocGeneration) ocFlushNow();
+});
+async function ocInit() {
+    let canonical = null, backup = null, legacyIdb = null;
+    const candidates = [];
+    let recovery = [], legacy = {};
+    try {
+        if (!localStorage.getItem("ss_view")) setView("thumbs-big");
+        for (const key of ["oc_stories", "oc_active", "ss_blocks", "ss_nextId"]) legacy[key] = localStorage.getItem(key);
+        recovery = ocReadRecovery();
+        ocLegacyKeys = legacy;
+    } catch (e) { quotaWarn("Не удалось прочитать localStorage: " + (e.name || e)); }
+    try {
+        canonical = await IDB.read("kv", "oc_snapshot");
+        backup = await IDB.read("kv", "oc_snapshot_backup");
+        if (canonical && (!ocValidSnapshot(canonical) || !canonical.rev)) throw new Error("Повреждён snapshot IDB");
+        if (!canonical) {
+            const stories = await IDB.read("kv", "oc_stories");
+            const activeId = await IDB.read("kv", "oc_active");
+            if (stories !== undefined && !ocValidSnapshot({ stories })) throw new Error("Повреждены legacy-сюжеты IDB");
+            if (stories) legacyIdb = { stories, activeId };
         }
+        window.SS_IDB_OK = true;
+    } catch (e) {
+        ocStorageError = "Не удалось прочитать IndexedDB: " + (e.name || e);
+        window.SS_IDB_OK = false;
     }
-    if (!Array.isArray(list) || !list.length) {
-        list = seedStories();                                   /* внутри читается легаси ss_blocks — чистим ключи ПОСЛЕ */
-        aid = list[0].id;
+    if (ocValidSnapshot(canonical)) candidates.push({ label: "IndexedDB · " + canonical.rev, snapshot: canonical });
+    else if (legacyIdb) candidates.push({ label: "Legacy IndexedDB", snapshot: legacyIdb });
+    try {
+        const stories = JSON.parse(legacy.oc_stories || "null");
+        if (stories !== null && !ocValidSnapshot({ stories })) throw new Error("Некорректные сюжеты LS");
+        if (stories) candidates.push({ label: "localStorage (legacy)", snapshot: { stories, activeId: JSON.parse(legacy.oc_active || "null") } });
+        else {
+            const blocks = JSON.parse(legacy.ss_blocks || "null");
+            if (Array.isArray(blocks) && blocks.length) {
+                const req = store.get("ss_req", {});
+                const st = newStory({ title: req.storyTitle || "Восстановленный сюжет", blocks,
+                    nextId: JSON.parse(legacy.ss_nextId || "1"), req });
+                candidates.push({ label: "localStorage (автосохранение)", snapshot: { stories: [st], activeId: st.id } });
+            }
+        }
+    } catch (e) {
+        ocLegacyKeys = null;
+        quotaWarn("Не удалось прочитать legacy localStorage. Сохраните снимок: " + (e.message || e));
     }
-    OC.stories = list;
-    OC.activeId = list.some(s => s.id === aid) ? aid : list[0].id;
-    OC.nextNum = Math.max(OC.nextNum, ...list.map(s => s.id + 1));
+    recovery.forEach(copy => {
+        if (ocValidSnapshot(copy.snapshot)) candidates.push({ label: "Recovery · " + copy.timestamp + " · " + copy.key, snapshot: copy.snapshot });
+    });
+    if (ocValidSnapshot(backup) && (!ocValidSnapshot(canonical) || candidates.length > 1 || recovery.length))
+        candidates.push({ label: "Предыдущий снимок IDB · " + (backup.timestamp || backup.rev), snapshot: backup });
+    if (!candidates.length) {
+        const stories = seedStories();
+        candidates.push({ label: "Новый сеанс", snapshot: { stories, activeId: stories[0].id } });
+    }
+    const needsChoice = candidates.length > 1 || recovery.length > 0;
+    const selected = needsChoice ? await ocChooseSnapshot(candidates, recovery) : candidates[0];
+    if (needsChoice) ocLegacyKeys = null;
+    const snapshot = JSON.parse(JSON.stringify(selected.snapshot));
+    OC.stories = snapshot.stories;
+    OC.activeId = OC.stories.some(s => s.id === snapshot.activeId) ? snapshot.activeId : OC.stories[0].id;
+    OC.nextNum = Math.max(OC.nextNum, ...OC.stories.map(s => s.id + 1));
+    ocBaseRev = ocQueuedRev = canonical && canonical.rev || null;
+    loadStory(OC.activeId, false);
     ocInitDone = true;
-    persistStories();                              /* снимок лёг в IDB (или LS-фолбэк); буферные вызовы покрыты им */
-    if (window.SS_IDB_OK) clearHeavyLsKeys();      /* освобождаем до 5 МБ localStorage — там больше не живём */
-    loadStory(OC.activeId);
-})();
+    if (!window.SS_IDB_OK) {
+        sbDirty();
+        ocRecovery(ocSnapshot(), ocBaseRev, ocStorageError);
+    } else if (!canonical && !needsChoice) {
+        await persistStories();
+    } else {
+        $("sbSaved").textContent = "Загружено: " + selected.label;
+        if (selected.snapshot === canonical) ocSavedGeneration = ocGeneration;
+        else sbDirty();
+    }
+    window.SS_STORAGE_LOADING = false;
+    $("workspace").inert = false;
+    if (needsChoice) quotaWarn("Версия выбрана; остальные копии сохранены. Сохраните черновик/снимок перед дальнейшей работой.");
+}
+ocInit().catch(e => {
+    quotaWarn("Загрузка остановлена: " + (e.message || e) + ". Перезагрузите страницу; исходные копии не удалены.");
+});

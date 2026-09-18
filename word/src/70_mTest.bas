@@ -62,6 +62,8 @@ Private Sub AddBlock(nd As Document, ByVal head As String, ByVal text As String,
             If Len(NormSp(CStr(fa(i)))) > 0 Then r.InsertAfter CStr(fa(i)) & vbCr
         Next i
     End If
+    r.Style = nd.Styles(wdStyleNormal)
+    nd.Range(r.Start, r.Start + Len(head)).Style = nd.Styles(wdStyleHeading2)
 End Sub
 
 ' собрать фикстуру (те же данные использует test/golden.py)
@@ -75,7 +77,7 @@ Private Function BuildFixture() As Document
         "Мы уже подали документы в администрацию.", _
         "фрагмент | A001C003.mov | 00:00:10:00 - 00:00:14:12 | sub/A001C003.mov;" & _
         "фрагмент | B mov.mov | 00:01:00:00 - 00:01:05:00 | B mov.mov")
-    Call AddBlock(nd, "Стендап 1", "Корреспондент у катка.", _
+    Call AddBlock(nd, "Стендап 1. А. Иванов, корреспондент", "Корреспондент у катка.", _
         "фрагмент | C1.mxf | 00:02:00:00 - 00:02:03:00 | C1.mxf")
     Call AddBlock(nd, "Лайф 1", "", _
         "фрагмент | D.mts | 00:03:00:00 - 00:03:02:11 | archive/2025/D.mts")
@@ -90,7 +92,43 @@ Private Function BuildFixture() As Document
     Set BuildFixture = nd
 End Function
 
-' фикстура -> /tmp/su_fish.csv и /tmp/su_mogrt.csv
+Private Sub AssertMogrt(nd As Document, ByVal expected As String)
+    If BuildMogrt(nd, ";") <> expected Then
+        Err.Raise vbObjectError + 701, "SU_T_Mogrt", "MOGRT contract mismatch"
+    End If
+End Sub
+
+Public Sub SU_T_Mogrt()
+    Dim nd As Document, header As String
+    Dim errNum As Long, errText As String
+    On Error GoTo failed
+    header = "Имя Фамилия;Должность"
+    Set nd = BuildFixture()
+    AssertMogrt nd, header & vbCrLf & "ИВАН ПЕТРОВ;ДИРЕКТОР ЗАВОДА" & vbCrLf & _
+        "А. ИВАНОВ;КОРРЕСПОНДЕНТ" & vbCrLf & "АННА СЕРГЕЕВНА ИВАНОВА;"
+    nd.Close False
+    Set nd = MkDoc()
+    AssertMogrt nd, header
+    Call AddBlock(nd, "Синхрон 1.", "", "")
+    Call AddBlock(nd, "Стендап 1", "", "")
+    Call AddBlock(nd, "Закадровый текст 1", "Лишний титр", "")
+    Call AddBlock(nd, "STANDUP 2. Ёлка ""Имя"", редактор; ведущая", "", "")
+    Call AddBlock(nd, "Синхрон 2. Анна Мария", "", "")
+    Call AddBlock(nd, "Синхрон 3. Анна Мария", "", "")
+    FixSpecialStyles nd
+    AssertMogrt nd, header & vbCrLf & """ЁЛКА """"ИМЯ"""""";""РЕДАКТОР; ВЕДУЩАЯ""" & _
+        vbCrLf & "АННА МАРИЯ;" & vbCrLf & "АННА МАРИЯ;"
+    nd.Close False
+    Exit Sub
+failed:
+    errNum = Err.Number
+    errText = Err.Description
+    On Error Resume Next
+    If Not nd Is Nothing Then nd.Close False
+    On Error GoTo 0
+    Err.Raise errNum, "SU_T_Mogrt", errText
+End Sub
+
 Public Sub SU_T_Export()
     Dim nd As Document
     Set nd = BuildFixture()

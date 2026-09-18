@@ -3,6 +3,9 @@
 
 const $ = id => document.getElementById(id);
 let quotaWarnShown = false;
+window.SS_STORAGE_LOADING = true;
+if ($("workspace")) $("workspace").inert = true;
+let storageReq;
 function lsUsage() {
     let total = 0; const sizes = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -14,7 +17,8 @@ function lsUsage() {
     return { total, top: sizes.slice(0, 3) };
 }
 function quotaWarn(detail) {
-    const u = lsUsage();
+    let u;
+    try { u = lsUsage(); } catch (e) { u = { total: 0, top: [] }; }
     const top = u.top.map(x => x[0] + " ≈" + Math.round(x[1] / 1024) + "K").join(", ") || "пусто";
     const b = $("quotaBanner");
     if (b) {
@@ -30,8 +34,16 @@ function quotaWarn(detail) {
 /* легаси-ключи: при нехватке места выкидываем их (данные дублируются в IndexedDB) */
 const LS_EVICT = ["ss_blocks", "ss_nextId", "oc_stories", "oc_active"];
 const store = {
-    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    get(k, d) {
+        try {
+            if (k === "ss_req" && storageReq !== undefined) return JSON.parse(JSON.stringify(storageReq));
+            const v = localStorage.getItem(k), value = v === null ? d : JSON.parse(v);
+            if (k === "ss_req") storageReq = value;
+            return value;
+        } catch (e) { return d; }
+    },
     set(k, v) {
+        if (k === "ss_req") { storageReq = JSON.parse(JSON.stringify(v)); return true; }
         let s; try { s = JSON.stringify(v); } catch (e) { quotaWarn("сериализация: " + e.name); return false; }
         try { localStorage.setItem(k, s); return true; }
         catch (e) {
@@ -41,7 +53,7 @@ const store = {
                 let freed = false;
                 for (const dead of LS_EVICT) {
                     if (dead === k) continue;
-                    if (!window.SS_LS_MIGRATED && (dead === "oc_stories" || dead === "oc_active")) continue;
+                    if (!window.SS_LS_MIGRATED) continue;
                     if (localStorage.getItem(dead) !== null) { localStorage.removeItem(dead); freed = true; }
                 }
                 if (freed) { try { localStorage.setItem(k, s); return true; } catch (e2) {} }
@@ -55,6 +67,7 @@ const store = {
 /* Точки расширения для оболочки МЕДИАЦЕНТРА (octopus.js назначает свои функции) —
    вместо опасного переназначения глобальных функций */
 window.SS_HOOK = {
+    afterDuration() {},
     afterRender() {},          /* после renderBlocks() */
     afterSave() {},            /* после saveState() */
     afterVideoList() {},       /* после refreshVideoList() */
@@ -73,6 +86,7 @@ let state = {
 let videoFiles = [];           /* [{name, relPath, file, url|null}] */
 let curFile = "";              /* имя файла в плеере */
 let curRelPath = "";           /* путь внутри выбранной папки */
+let videoLoadSeq = 0, videoLoading = false;
 let markIn = null, markOut = null; /* секунды */
 let marksSet = false;          /* метки заданы пользователем/фрагментом — дефолт не применять */
 let limitToMarks = false;      /* воспроизведение только фрагмента In→Out */
@@ -374,7 +388,8 @@ document.querySelectorAll(".nf-gear").forEach(btn =>
     btn.addEventListener("click", () => openNmModal(btn.dataset.names)));
 REQ_IDS.forEach(k => {
     if (NAME_IDS.includes(k) || k === "fpsInput") return;
-    $(k).addEventListener("change", () => { saveReq(); renderBlocks(); });
+    $(k).addEventListener("change", () => { saveReq(); if (k === "readSpeed") refreshDur(); });
+    if (k === "readSpeed") $(k).addEventListener("input", () => refreshDur());
 });
 /* fps: валидация, пересчёт ТК на экране и в блоках; значение — в черновик/реквизиты */
 $("fpsInput").addEventListener("change", () => {
@@ -382,10 +397,21 @@ $("fpsInput").addEventListener("change", () => {
     const v = parseFloat(inp.value);
     if (!(v > 0 && v <= 240)) inp.value = store.get("ss_req", {}).fpsInput || DEFAULT_FPS;
     saveReq();
-    if ($("player").duration) $("fileDur").textContent = tc($("player").duration);
-    updateMarks();
-    renderBlocks();
+    refreshTiming();
 });
+$("fpsInput").addEventListener("input", refreshTiming);
+function refreshTiming() {
+    if (Number.isFinite($("player").duration)) $("fileDur").textContent = tc($("player").duration);
+    updateMarks();
+    state.blocks.forEach((b, i) => {
+        const rows = $("blocks").children[i]?.querySelectorAll(".doc-part");
+        if (rows) rows.forEach((row, pi) => {
+            const cell = row.querySelector(".tc"), part = b.parts[pi];
+            if (cell && part) cell.textContent = tc(part.in) + " → " + tc(part.out);
+        });
+    });
+    refreshDur();
+}
 
 /* ---------- модальные вопросы вместо prompt()/confirm() ---------- */
 function trapTab(container, e) {
@@ -452,8 +478,12 @@ const IDB = (() => {
             if (typeof indexedDB === "undefined") return rej(new Error("нет IndexedDB"));
             const r = indexedDB.open("ss-studio", 1);
             r.onupgradeneeded = () => { r.result.createObjectStore("posters"); r.result.createObjectStore("kv"); };
-            r.onsuccess = () => res(r.result);
+            r.onsuccess = () => {
+                r.result.onversionchange = () => { r.result.close(); dbP = null; };
+                res(r.result);
+            };
             r.onerror = () => rej(r.error);
+            r.onblocked = () => rej(new Error("IndexedDB заблокирован: закройте старые вкладки"));
         }).catch(e => { dbP = null; throw e; });
         return dbP;
     }
@@ -462,12 +492,39 @@ const IDB = (() => {
             const t = db.transaction(name, mode);
             const rq = fn(t.objectStore(name));
             t.oncomplete = () => res(rq ? rq.result : undefined);
-            t.onerror = () => rej(t.error);
-            t.onabort = () => rej(t.error);
+            t.onerror = () => rej(t.error || new Error("IndexedDB transaction failed"));
+            t.onabort = () => rej(t.error || new Error("IndexedDB transaction aborted"));
         }));
     }
-    /* тихие операции не должны ронять UI; put() — для критичных данных, ошибка наружу */
+    function compareSnapshot(baseRev, value) {
+        const snapshot = JSON.parse(JSON.stringify(value));
+        return open().then(db => new Promise((res, rej) => {
+            const t = db.transaction("kv", "readwrite"), o = t.objectStore("kv");
+            let failure;
+            t.oncomplete = () => res(snapshot);
+            t.onerror = () => rej(failure || t.error || new Error("IndexedDB write failed"));
+            t.onabort = () => rej(failure || t.error || new Error("IndexedDB aborted"));
+            const r = o.get("oc_snapshot");
+            r.onsuccess = () => {
+                try {
+                    const previous = r.result;
+                    if ((previous ? previous.rev : null) !== baseRev) {
+                        failure = new Error("Сюжеты изменены другой вкладкой");
+                        failure.name = "ConflictError";
+                        t.abort();
+                        return;
+                    }
+                    if (!snapshot.rev || snapshot.rev === baseRev || !Array.isArray(snapshot.stories))
+                        throw new Error("Некорректный снимок");
+                    o.put(previous || snapshot, "oc_snapshot_backup");
+                    o.put(snapshot, "oc_snapshot");
+                } catch (e) { failure = e; t.abort(); }
+            };
+        }));
+    }
     return {
+        read: (s, k) => wrap(s, "readonly", o => o.get(k)),
+        compareSnapshot,
         get: (s, k) => wrap(s, "readonly", o => o.get(k)).catch(() => undefined),
         set: (s, k, v) => wrap(s, "readwrite", o => o.put(v, k)).catch(() => {}),
         put: (s, k, v) => wrap(s, "readwrite", o => o.put(v, k)),
@@ -757,6 +814,7 @@ function refreshVideoList() {
             });
         }
     }
+    refreshTargets();
     SS_HOOK.afterVideoList();
 }
 $("btnRescan").addEventListener("click", () => {
@@ -785,8 +843,14 @@ $("videoSearch").addEventListener("keydown", e => {
 
 /* ---------- плеер и метки (монитор в стиле Source Monitor) ---------- */
 async function loadVideo(f) {
+    const seq = ++videoLoadSeq;
+    videoLoading = true;
+    markIn = markOut = null;
+    updateMarks();
     const url = await ensureUrl(f);
-    if (!url) return;
+    if (seq !== videoLoadSeq) return false;
+    videoLoading = false;
+    if (!url || !videoFiles.includes(f)) { updateMarks(); return false; }
     const p = $("player");
     p.src = url;
     curFile = f.name;
@@ -804,9 +868,11 @@ async function loadVideo(f) {
     const it = [...$("videoList").children].find(x => x.dataset.rel === f.relPath);
     if (it) it.classList.add("sel");
     p.play().catch(() => {});
+    return true;
 }
 /* внятная причина, если браузер не тянет файл (чаще всего DJI в HEVC/H.265) */
 $("player").addEventListener("error", () => {
+    updateMarks();
     if (!curFile) return;
     toast("Браузер не воспроизводит «" + curFile +
           "». Вероятно, файл в HEVC (H.265) — откройте его в Safari или перекодируйте.", "err");
@@ -822,6 +888,7 @@ $("player").addEventListener("loadedmetadata", () => {
     if (!marksSet) { markIn = 0; markOut = p.duration; }
     updateMarks();
 });
+["durationchange", "emptied", "loadstart"].forEach(name => $("player").addEventListener(name, updateMarks));
 $("player").addEventListener("play", () => { $("btnPlay").classList.add("playing"); });
 $("player").addEventListener("pause", () => { $("btnPlay").classList.remove("playing"); });
 $("player").addEventListener("seeked", () => { $("curTc").textContent = tc($("player").currentTime); });
@@ -917,6 +984,7 @@ function dragHandle(which, e) {
         markOut = Math.min(p.duration, markOut);
         p.currentTime = markOut;
     }
+    marksSet = true;
     updateScrub();
     updateMarksText();
 }
@@ -969,8 +1037,14 @@ function togglePreview() {
 /* (кнопки в транспортёре нет — только клавиша P) */
 
 function updateMarksText() {
-    /* позиции ручек обновляет updateScrub(); текст ТК меток — при драге */
     $("curTc").textContent = tc($("player").currentTime);
+    const values = {
+        markInTc: Number.isFinite(markIn) ? tc(markIn) : "—",
+        markOutTc: Number.isFinite(markOut) ? tc(markOut) : "—",
+        markDuration: Number.isFinite(markIn) && Number.isFinite(markOut) && markOut > markIn ? tc(markOut - markIn) : "—"
+    };
+    Object.entries(values).forEach(([id, text]) => { if ($(id)) $(id).textContent = text; });
+    refreshTargets();
 }
 function updateMarks() {
     updateScrub();
@@ -1044,32 +1118,84 @@ function addAndFocus(kind) {
 }
 
 /* ПКМ по пустому месту окна сценария — меню «добавить блок» (в конец) */
-function closeAddKindMenu() { const m = $("addKindMenu"); if (m) m.remove(); }
-function showAddKindMenu(x, y) {
+function closeAddKindMenu(restoreFocus = false) {
+    const menu = $("addKindMenu");
+    if (!menu) return;
+    const anchor = menu._anchor;
+    document.removeEventListener("mousedown", menu._outside, true);
+    document.removeEventListener("keydown", menu._keys, true);
+    menu.remove();
+    if (anchor) anchor.setAttribute("aria-expanded", "false");
+    if (restoreFocus && anchor?.isConnected) anchor.focus();
+}
+function showAddKindMenu(x, y, anchor = document.activeElement) {
     closeAddKindMenu();
     const menu = document.createElement("div");
     menu.id = "addKindMenu"; menu.className = "kind-menu";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", "Добавить блок");
+    menu._anchor = anchor;
+    if (anchor) anchor.setAttribute("aria-expanded", "true");
     Object.entries(KIND_META).forEach(([k, m]) => {
         const it = document.createElement("button");
+        it.type = "button";
+        it.setAttribute("role", "menuitem");
         it.className = "kind-item " + k;
         it.innerHTML = `${icon(k, 14)}<span class="ki-code">${esc(m.badge)}</span><span class="ki-ru">${esc(m.ru)}</span>`;
-        it.onmousedown = e => { e.stopPropagation(); menu.remove(); addAndFocus(k); };
+        it.onclick = () => { closeAddKindMenu(); addAndFocus(k); };
         menu.appendChild(it);
     });
     document.body.appendChild(menu);
-    menu.style.left = Math.min(x, window.innerWidth - menu.offsetWidth - 8) + "px";
-    menu.style.top = Math.min(y, window.innerHeight - menu.offsetHeight - 8) + "px";
-    setTimeout(() => document.addEventListener("mousedown", closeAddKindMenu, { once: true }), 0);
+    menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menu.offsetWidth - 8)) + "px";
+    menu.style.top = Math.max(8, Math.min(y, window.innerHeight - menu.offsetHeight - 8)) + "px";
+    menu._outside = e => { if (!menu.contains(e.target) && !anchor?.contains(e.target)) closeAddKindMenu(); };
+    document.addEventListener("mousedown", menu._outside, true);
+    menu._keys = e => {
+        if (e.key === "Escape") {
+            e.preventDefault(); e.stopImmediatePropagation(); closeAddKindMenu(true);
+        } else if (menu.contains(e.target)) {
+            const items = [...menu.children], index = items.indexOf(document.activeElement);
+            if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+                e.preventDefault(); e.stopImmediatePropagation();
+                const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 :
+                    (index + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+                items[next].focus();
+            } else if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault(); e.stopImmediatePropagation();
+                if (!e.repeat) items[index]?.click();
+            } else if (e.key === "Tab") closeAddKindMenu();
+        }
+    };
+    document.addEventListener("keydown", menu._keys, true);
+    menu.children[0]?.focus();
 }
+function bindAddBlockButton(button) {
+    if (!button) return;
+    button.setAttribute("aria-haspopup", "menu");
+    button.setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-controls", "addKindMenu");
+    button.onclick = () => {
+        if ($("addKindMenu")?._anchor === button) { closeAddKindMenu(true); return; }
+        const r = button.getBoundingClientRect();
+        showAddKindMenu(r.left, r.bottom + 4, button);
+    };
+    button.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault(); e.stopPropagation();
+        if (!e.repeat) button.click();
+    });
+}
+bindAddBlockButton($("btnAddBlock"));
 $("blocks").addEventListener("contextmenu", e => {
     const row = e.target.closest(".doc-block");
-    if (!row) { e.preventDefault(); showAddKindMenu(e.clientX, e.clientY); return; }
-    const b = state.blocks.find(x => x.id === +row.dataset.id);
-    if (b && PART_KINDS.has(b.kind)) {   /* окно блока с фрагментами — своё меню */
-        e.preventDefault();
-        showBlockCtxMenu(e.clientX, e.clientY, b, row);
+    if (row) {   /* внутри блока: своё меню у фрагментных, нативное — у остальных */
+        const b = state.blocks.find(x => x.id === +row.dataset.id);
+        if (b && PART_KINDS.has(b.kind)) { e.preventDefault(); showBlockCtxMenu(e.clientX, e.clientY, b, row); }
+        return;
     }
-    /* остальные блоки — нативное меню браузера (копипаст) */
+    e.preventDefault();
+    if ($("addKindMenu")) closeAddKindMenu();
+    showAddKindMenu(e.clientX, e.clientY, null);
 });
 
 /* ПКМ в окне блока СИНХ/СТЕНД/ЛАЙФ/ШПИГ: добавить фрагмент + буфер обмена */
@@ -1348,11 +1474,9 @@ function moveBlock(id, dir) {
     focusBlock(id, caret);
 }
 function pullPart(b) {
-    if (!PART_KINDS.has(b.kind))
-        return toast("Этот блок — только текст", "err");
-    if (!curFile) return toast("Сначала откройте видео (клик в списке)", "err");
-    if (markIn === null || markOut === null)
-        return toast("Поставьте метки входа и выхода (I / O)", "err");
+    const reason = sendReason(b);
+    if (reason) { refreshTargets(); return toast(reason, "err"); }
+    setCurrentBlock(b.id);
     histBefore();
     const vf = videoFiles.find(v => v.name === curFile && v.relPath === curRelPath) ||
                videoFiles.find(v => v.name === curFile);
@@ -1364,17 +1488,66 @@ function pullPart(b) {
     focusBlock(b.id, 99999);
 }
 /* drag файла из Медиабраузера на блок СИНХ/СТЕНД/ЛАЙФ/ШПИГ — целый файл (править in/out на месте) */
-function addWholeFilePart(b, relPath) {
-    if (!PART_KINDS.has(b.kind)) return;
+function currentStoryId() {
+    return typeof OC !== "undefined" && OC.activeId != null ? String(OC.activeId) : null;
+}
+const durationLoads = new WeakMap();
+function wholeFileDuration(vf) {
+    if (Number.isFinite(vf.dur) && vf.dur > 0) return Promise.resolve(vf.dur);
+    if (durationLoads.has(vf)) return durationLoads.get(vf);
+    const pending = new Promise((resolve, reject) => {
+        let video = null, url = null, settled = false;
+        const finish = (error, duration) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (video) {
+                video.onloadedmetadata = video.ondurationchange = video.onerror = null;
+                video.removeAttribute("src");
+                video.load();
+            }
+            if (url) URL.revokeObjectURL(url);
+            if (error) reject(error);
+            else { vf.dur = duration; resolve(duration); }
+        };
+        const timer = setTimeout(() => finish(new Error("истекло время ожидания длительности")), 20000);
+        Promise.resolve().then(async () => {
+            const file = vf.file || (vf.handle && await vf.handle.getFile());
+            if (settled) return;
+            if (!file) throw new Error("файл недоступен");
+            video = document.createElement("video");
+            video.preload = "metadata";
+            video.muted = true;
+            video.onloadedmetadata = video.ondurationchange = () => {
+                if (Number.isFinite(video.duration) && video.duration > 0) finish(null, video.duration);
+            };
+            video.onerror = () => finish(new Error("длительность видео не распознана"));
+            url = URL.createObjectURL(file);
+            video.src = url;
+        }).catch(error => finish(error));
+    });
+    durationLoads.set(vf, pending);
+    const clear = () => durationLoads.delete(vf);
+    pending.then(clear, clear);
+    return pending;
+}
+async function addWholeFilePart(b, relPath) {
+    if (!PART_KINDS.has(b.kind) || !state.blocks.includes(b)) return;
     const vf = videoFiles.find(v => v.relPath === relPath);
     if (!vf) return toast("Файл не найден в папке исходников: " + relPath, "err");
+    const blocks = state.blocks, storyId = currentStoryId();
+    let duration;
+    try { duration = await wholeFileDuration(vf); }
+    catch (error) { return toast("Файл не добавлен: " + error.message, "err"); }
+    if (state.blocks !== blocks || currentStoryId() !== storyId || !state.blocks.includes(b) ||
+        !PART_KINDS.has(b.kind) || !videoFiles.includes(vf))
+        return toast("Файл не добавлен: сюжет, блок или папка исходников изменились", "warn");
     histBefore();
-    b.parts.push({ file: vf.name, path: vf.relPath, in: 0, out: vf.dur || 0 });
+    b.parts.push({ file: vf.name, path: vf.relPath, in: 0, out: duration });
     b.folded = false;
     b.partsFolded = false;
     renderBlocks(); saveState();
-    if (!vf.dur) toast("«" + vf.name + "» добавлен целым; длительность не распознана — поправьте таймкоды", "warn", 5000);
-    else toast("«" + vf.name + "» целым файлом → " + blockTitle(b, typeNumbers()[b.id]) + " (Ctrl+Z — отменить)", "ok");
+    toast("«" + vf.name + "» целым файлом → " + blockTitle(b, typeNumbers()[b.id]) + " (Ctrl+Z — отменить)", "ok");
 }
 
 /* ---------- Ctrl+Z / Ctrl+Y: снапшоты документа ---------- */
@@ -1423,8 +1596,12 @@ function renderBlocks() {
     /* offline-проверка: папка просканирована, но пути фрагмента в ней нет */
     const known = videoFiles.length ? new Set(videoFiles.map(v => v.relPath)) : null;
     if (!state.blocks.length) {
-        host.innerHTML = '<div class="empty-hint">Документ пуст. Нажмите ПКМ по пустому месту — добавить блок, ' +
-            'или наберите в новой строке «хед», «зк», «синх»… либо VO / SOT / NAT / HEAD + пробел.</div>';
+        host.innerHTML = '<div class="empty-hint">Сценарий пуст. Добавьте первый блок.</div>';
+        const button = document.createElement("button");
+        button.type = "button"; button.id = "btnEmptyAddBlock";
+        button.textContent = "Добавить блок";
+        host.querySelector(".empty-hint").appendChild(button);
+        bindAddBlockButton(button);
     }
 
     state.blocks.forEach((b, i) => {
@@ -1495,7 +1672,8 @@ function renderBlocks() {
                               "» из " + dups.length + ": " + vf.relPath, "warn");
                 }
                 if (!vf) return toast("Файл не в списке: " + p.file, "err");
-                loadVideo(vf).then(() => {
+                loadVideo(vf).then(loaded => {
+                    if (!loaded || !state.blocks.includes(b) || !b.parts.includes(p)) return;
                     markIn = p.in; markOut = p.out; marksSet = true; updateMarks();
                     $("player").currentTime = p.in;
                     limitToMarks = true;
@@ -1507,7 +1685,8 @@ function renderBlocks() {
 
         const ta = div.querySelector(".doc-text");
         ta.addEventListener("input", () => { histTyping(); b.text = ta.value; autogrow(ta); saveState(); refreshDur(i); });
-        ta.addEventListener("focus", () => { setCurrentBlock(b.id); autogrow(ta); });
+        div.addEventListener("focusin", () => setCurrentBlock(b.id));
+        ta.addEventListener("focus", () => autogrow(ta));
         ta.addEventListener("keydown", e => {
             if ((e.key === " " || e.key === "Enter") && docTrigger(ta, b, i)) { e.preventDefault(); return; }
             if (e.key === "Backspace" && ta.selectionStart === 0 && ta.selectionEnd === 0 && docMergePrev(b, i)) { e.preventDefault(); return; }
@@ -1612,29 +1791,54 @@ function renderBlocks() {
 }
 /* обновить только колонку длительности (без полного ререндера при печати) */
 function refreshDur(i) {
-    const el = $("blocks").children[i];
-    if (!el || !el.querySelector) return;
-    const b = state.blocks[i];
-    const dur = blockDur(b);
-    const est = !(PART_KINDS.has(b.kind) && b.parts.length) && dur > 0;
-    const cell = el.querySelector(".doc-dur");
-    if (cell) cell.textContent = (est ? "~" : "") + durTc(dur);
+    state.blocks.forEach((b, index) => {
+        if (i !== undefined && i !== index) return;
+        const cell = $("blocks").children[index]?.querySelector(".doc-dur");
+        const dur = blockDur(b);
+        const est = !(PART_KINDS.has(b.kind) && b.parts.length) && dur > 0;
+        if (cell) {
+            cell.textContent = (est ? "~" : "") + durTc(dur);
+            cell.title = est ? "Оценка по длине текста (~" + Math.round(readCps()) + " зн/с)" : "Сумма таймкодов фрагментов";
+        }
+    });
+    const total = state.blocks.reduce((sum, b) => sum + blockDur(b), 0);
+    const td = $("totalDur");
+    if (td) td.textContent = state.blocks.length ? "Хронометраж: " + (total > 0 ? durTc(total) + " (оценки с ~)" : "00:00") : "";
     updateMiniTl();
+    SS_HOOK.afterDuration();
 }
 
 /* цель для «В сценарий →»: существующие блоки + пункт «новый блок типа «как»» */
 /* подпись цели «В сценарий →» в транспортёре (currentBlock = блок с фокусом) */
+function sendReason(b) {
+    if (!b || !state.blocks.includes(b)) return "Выберите блок SOT / STANDUP / LIFE / SPIEGEL";
+    if (!PART_KINDS.has(b.kind)) return "Этот блок — только текст. Выберите SOT / STANDUP / LIFE / SPIEGEL";
+    const p = $("player");
+    const file = videoFiles.find(v => v.name === curFile && v.relPath === curRelPath);
+    if (videoLoading) return "Подождите загрузки видео";
+    if (!curFile || !file || !file.url || p.src !== file.url) return "Откройте видео из папки исходников";
+    if (p.error) return "Видео недоступно — откройте другой файл";
+    if (p.readyState < 1 || !Number.isFinite(p.duration) || p.duration <= 0) return "Подождите загрузки длительности видео";
+    if (!Number.isFinite(markIn) || !Number.isFinite(markOut)) return "Поставьте метки In и Out (I / O)";
+    if (markIn < 0 || markOut <= markIn) return "Out должен быть позже In, а In — не раньше начала файла";
+    if (markOut > p.duration) return "Метки выходят за длительность файла";
+    return "";
+}
 function refreshTargets() {
-    const lbl = $("curBlock");
-    if (!lbl) return;
     const b = state.blocks.find(x => x.id === currentBlockId);
-    lbl.textContent = b ? "→ " + blockTitle(b, typeNumbers()[b.id]) : "";
+    if (!b) currentBlockId = null;
+    const lbl = $("curBlock");
+    if (lbl) lbl.textContent = b ? "→ " + blockTitle(b, typeNumbers()[b.id]) : "";
+    document.querySelectorAll("#blocks .doc-block").forEach(el =>
+        el.classList.toggle("send-target", !!b && PART_KINDS.has(b.kind) && +el.dataset.id === b.id));
+    const reason = sendReason(b), button = $("btnSend"), hint = $("sendHint");
+    const message = reason || "Отправить In → Out в «" + blockTitle(b, typeNumbers()[b.id]) + "»";
+    if (button) { button.disabled = !!reason; button.title = message; }
+    if (hint) { hint.textContent = message; hint.hidden = false; }
 }
 /* отправка разметки: фрагмент In→Out в текущий блок (куда курсор) */
 $("btnSend").addEventListener("click", () => {
     const b = state.blocks.find(x => x.id === currentBlockId);
-    if (!b) return toast("Кликните в SOT/STANDUP/LIFE/SPIEGEL (или создайте блок ПКМ), затем «Send →»", "err", 5000);
-    if (!PART_KINDS.has(b.kind)) return toast("Текущий блок — только текст. Фрагменты — в SOT, стендап, лайф или шпигель", "err", 5000);
     pullPart(b);
 });
 
@@ -1679,23 +1883,30 @@ function openSearch() {
     $("findInput").select();
     doFind();
 }
+function clearFindHighlight() {
+    document.querySelectorAll("#blocks .find-hit").forEach(el => el.classList.remove("find-hit"));
+}
 function closeSearch() {
     $("findBar").hidden = true;
+    clearFindHighlight();
     findHits = []; findPos = -1;
     $("findCount").textContent = "";
 }
 function collectFind(q) {
+    clearFindHighlight();
     findHits = []; findPos = -1;
     if (!q) { $("findCount").textContent = ""; return; }
     const needle = q.toLowerCase();
     state.blocks.forEach(b => {
-        const hay = (TITR_KINDS.has(b.kind) ? (b.speaker + " " + b.role + "\n") : "") + b.text;
-        let i = hay.toLowerCase().indexOf(needle);
-        while (i !== -1) {
-            findHits.push({ id: b.id, start: i });
-            if (findHits.length > 500) return;
-            i = hay.toLowerCase().indexOf(needle, i + needle.length);
-        }
+        const fields = TITR_KINDS.has(b.kind) ? ["speaker", "role", "text"] : ["text"];
+        fields.forEach(field => {
+            const hay = (b[field] || "").toLowerCase();
+            let i = hay.indexOf(needle);
+            while (i !== -1 && findHits.length < 500) {
+                findHits.push({ id: b.id, field, start: i, end: i + needle.length });
+                i = hay.indexOf(needle, i + needle.length);
+            }
+        });
     });
     $("findCount").textContent = findHits.length ? "" : "ничего не найдено";
 }
@@ -1703,19 +1914,24 @@ function gotoFind(delta) {
     if (!findHits.length) return;
     findPos = (findPos + delta + findHits.length) % findHits.length;
     const h = findHits[findPos];
+    const b = state.blocks.find(x => x.id === h.id);
+    if (!b) { doFind(); return; }
     const el = document.querySelector('.doc-block[data-id="' + h.id + '"]');
     if (!el) return;
-    const b = state.blocks.find(x => x.id === h.id);
-    if (b.folded) { b.folded = false; renderBlocks(); }
-    const ta = document.querySelector('.doc-block[data-id="' + h.id + '"] .doc-text');
+    if (b.folded) {
+        b.folded = false;
+        el.classList.remove("folded");
+        el.querySelector(".fold-sum")?.remove();
+        const ta = el.querySelector(".doc-text");
+        if (ta) autogrow(ta);
+    }
+    clearFindHighlight();
+    const field = el.querySelector(h.field === "text" ? ".doc-text" : ".b-" + h.field);
     $("findCount").textContent = (findPos + 1) + " / " + findHits.length;
-    if (ta) {
-        const inText = Math.max(0, h.start - (TITR_KINDS.has(b.kind) ? (b.speaker + " " + b.role + "\n").length : 0));
-        ta.scrollIntoView({ block: "center", behavior: "smooth" });
-        ta.focus();
-        try { ta.setSelectionRange(inText, inText + ($("findInput").value || "").length); } catch (e) {}
-    } else {
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (field) {
+        field.classList.add("find-hit");
+        field.setSelectionRange(h.start, h.end);
+        field.scrollIntoView({ block: "center", behavior: "smooth" });
     }
 }
 function doFind() {
@@ -1726,8 +1942,8 @@ $("findInput").addEventListener("input", doFind);
 $("findInput").addEventListener("keydown", e => {
     if (e.key === "Enter") { e.preventDefault(); gotoFind(e.shiftKey ? -1 : 1); }
 });
-$("findNext").onclick = () => gotoFind(1);
-$("findPrev").onclick = () => gotoFind(-1);
+$("findNext").onclick = () => { gotoFind(1); $("findInput").focus(); };
+$("findPrev").onclick = () => { gotoFind(-1); $("findInput").focus(); };
 $("findClose").onclick = closeSearch;
 $("btnFind").onclick = () => $("findBar").hidden ? openSearch() : closeSearch();
 
@@ -1858,8 +2074,22 @@ function wxPara(runs, style) {
     return "<w:p><w:pPr>" + (style ? '<w:pStyle w:val="' + style + '"/>' : "") +
         '<w:jc w:val="left"/></w:pPr>' + runs + "</w:p>";
 }
+function wordBookmarkName(prefix, id) {
+    return prefix + Array.from(new TextEncoder().encode(String(id)), n => n.toString(16).padStart(2, "0")).join("");
+}
+function wordBookmarkId(name, prefix) {
+    const hex = name.slice(prefix.length);
+    if (!hex || !/^(?:[0-9a-f]{2})+$/i.test(hex)) throw new Error("повреждён ID в закладке Word");
+    return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(hex.match(/../g), n => parseInt(n, 16)));
+}
+function wxBookmark(name, id, runs) {
+    return '<w:bookmarkStart w:id="' + id + '" w:name="' + name + '"/>' + runs +
+        '<w:bookmarkEnd w:id="' + id + '"/>';
+}
 function buildDocx() {
-    let body = wxPara(wxRun($("storyTitle").value || "Сюжет"), "Heading1");
+    const storyId = currentStoryId();
+    const title = wxRun($("storyTitle").value || "Сюжет");
+    let body = wxPara(storyId === null ? title : wxBookmark(wordBookmarkName("SS_S_", storyId), 0, title), "Heading1");
     const req = [["Корреспондент:", resolveNameValue("fioReporter") || "—"],
                  ["Оператор:", resolveNameValue("fioCam") || "—"],
                  ["Монтажёр:", resolveNameValue("fioEditor") || "—"],
@@ -1871,20 +2101,21 @@ function buildDocx() {
     });
     body += wxPara(runs);
     let voN = 0, suN = 0, syN = 0, liN = 0, hdN = 0;
-    state.blocks.forEach(b => {
+    state.blocks.forEach((b, index) => {
         let head, ital = false;
         if (b.kind === "headline") { hdN++; head = "Заголовок " + hdN; }
         else if (b.kind === "vo") { voN++; head = "Закадровый текст " + voN; }
-        else if (b.kind === "standup") { suN++; head = "Стендап " + suN + (b.speaker ? ". " + b.speaker + (b.role ? ", " + b.role : "") : ""); ital = true; }
+        else if (b.kind === "standup") { suN++; head = "Стендап " + suN + ". " + (b.speaker || "") + (b.role ? ", " + b.role : ""); ital = true; }
         else if (b.kind === "life") { liN++; head = "Лайф " + liN; ital = true; }
         else if (b.kind === "spiegel") { head = "Шпигель"; ital = true; }
         else if (b.kind === "vod") { head = "Подводка"; }
         else {
             syN++;
-            head = "Синхрон " + syN + ". " + (b.speaker || "спикер") + (b.role ? ", " + b.role : "");
+            head = "Синхрон " + syN + ". " + (b.speaker || "") + (b.role ? ", " + b.role : "");
             ital = true;
         }
-        body += wxPara(wxRun(head), "Heading2") + wxPara(wxRun(b.text, { i: ital }));
+        body += wxPara(wxBookmark(wordBookmarkName("SS_B_", b.id), index + 1, wxRun(head)), "Heading2") +
+            wxPara(wxRun(b.text, { i: ital }));
     });
     const xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
     return zipStore([
@@ -1995,17 +2226,15 @@ function normalizeBlocks(arr) {
         }));
 }
 function saveState() {
+    if (window.SS_STORAGE_LOADING) return;
     saveReq();
-    /* легаси-дубль в localStorage — только пока миграция в IndexedDB не выполнена
-       (SS_LS_MIGRATED ставит octopus.js); иначе забиваем квоту вторым экземпляром сюжета */
-    if (!window.SS_LS_MIGRATED && !Array.isArray(store.get("oc_stories", null))) {
-        store.set("ss_blocks", state.blocks);
-        store.set("ss_nextId", state.nextId);
-    }
     SS_HOOK.afterSave();
 }
 function loadDraftData(d) {
     if (!d || !Array.isArray(d.blocks)) return false;
+    currentBlockId = null;
+    closeSearch();
+    closeAddKindMenu();
     state.blocks = normalizeBlocks(d.blocks);
     const maxId = Math.max(0, ...state.blocks.map(b => b.id));
     state.nextId = Math.max(+d.nextId || 1, maxId + 1);
@@ -2082,7 +2311,8 @@ function wordItemsToBlocks(items) {
     const blocks = [], unknown = [];
     items.forEach(it => {
         const key = parseWordHead(it.head);
-        if (key) blocks.push(Object.assign({ text: it.lines.join("\n") }, key));
+        if (key || it.id !== undefined) blocks.push(Object.assign({ text: it.lines.join("\n") }, key,
+            it.id !== undefined ? { id: it.id } : {}));
         else unknown.push(it.head);
     });
     return { blocks, unknown };
@@ -2168,17 +2398,30 @@ async function parseDocx(arrayBuf) {
     };
     const xml = await docunzip(arrayBuf, "word/document.xml");
     const doc = new DOMParser().parseFromString(xml, "text/xml");
+    if (doc.getElementsByTagName("parsererror").length) throw new Error("повреждён XML документа");
+    const storyIds = [...doc.getElementsByTagName("w:bookmarkStart")]
+        .map(n => n.getAttribute("w:name") || "").filter(n => n.startsWith("SS_S_"))
+        .map(n => wordBookmarkId(n, "SS_S_"));
+    if (new Set(storyIds).size > 1) throw new Error("документ содержит ID разных сюжетов");
     const items = [];
     let cur = null;
     [...doc.getElementsByTagName("w:p")].forEach(p => {
         const st = p.getElementsByTagName("w:pStyle")[0];
         const style = st ? (st.getAttribute("w:val") || "") : "";
+        const ids = [...p.getElementsByTagName("w:bookmarkStart")]
+            .map(n => n.getAttribute("w:name") || "").filter(n => n.startsWith("SS_B_"))
+            .map(n => wordBookmarkId(n, "SS_B_"));
+        if (ids.length > 1) throw new Error("несколько ID блока в одном заголовке");
         const text = docxParaText(p);
-        if (!text) return;
-        if (isHead(style)) { cur = { head: normWs(text), lines: [] }; items.push(cur); }
-        else if (cur) cur.lines.push(text);
+        if (ids.length || isHead(style)) {
+            cur = { head: normWs(text), lines: [] };
+            if (ids.length) cur.id = ids[0];
+            items.push(cur);
+        } else if (cur && text) cur.lines.push(text);
     });
-    return wordItemsToBlocks(items);
+    const parsed = wordItemsToBlocks(items);
+    if (storyIds.length) parsed.storyId = storyIds[0];
+    return parsed;
 }
 /* если UTF-8 прочитался «кракозябрами» без кириллицы — перечитать в windows-1251 */
 function readAsTextSmart(f) {
@@ -2219,26 +2462,49 @@ async function importWordFile(f) {
 
 let wordPlan = null;   /* {rows, fresh, unknown} */
 function buildWordPlan(parsed) {
+    const storyId = currentStoryId();
+    if (parsed.storyId !== undefined && String(parsed.storyId) !== storyId)
+        throw new Error("ID сюжета в Word не совпадает с открытым сюжетом");
     const nums = typeNumbers();
-    const used = new Set(), rows = [], fresh = [];
-    parsed.blocks.forEach(it => {
-        const free = state.blocks.filter(x => x.kind === it.kind && !used.has(x.id));
-        let b;
-        if (Number.isFinite(it.num)) b = free.find(x => nums[x.id] === it.num);
-        if (!b && (it.kind === "spiegel" || it.kind === "vod")) b = free[0];
-        if (!b && TITR_KINDS.has(it.kind) && it.speaker)     /* подстраховка: поиск по спикеру */
-            b = free.find(x => normWs(x.speaker).toLowerCase() === it.speaker.toLowerCase());
-        if (!b) { fresh.push(it); return; }
-        used.add(b.id);
+    const used = new Set(), blocked = new Set(), rows = [], fresh = [], ambiguous = [];
+    const identified = new Set(parsed.blocks.filter(it => it.id !== undefined).map(it => String(it.id)));
+    const proposals = parsed.blocks.map(it => {
+        let candidates;
+        if (it.id !== undefined) candidates = state.blocks.filter(b => String(b.id) === String(it.id));
+        else {
+            const sameKind = state.blocks.filter(b => b.kind === it.kind);
+            candidates = Number.isFinite(it.num) ? sameKind.filter(b => nums[b.id] === it.num) : [];
+            if (!candidates.length && (it.kind === "spiegel" || it.kind === "vod")) candidates = sameKind;
+            if (!candidates.length && TITR_KINDS.has(it.kind) && it.speaker)
+                candidates = sameKind.filter(b => normWs(b.speaker).toLowerCase() === normWs(it.speaker).toLowerCase());
+        }
+        return { it, candidates };
+    });
+    proposals.forEach(({ it, candidates }) => {
+        if (!candidates.length) { fresh.push(it); return; }
+        const b = candidates[0];
+        const conflict = candidates.length !== 1 ||
+            (it.id === undefined && identified.has(String(b.id))) ||
+            proposals.some(p => p.it !== it && p.candidates.includes(b) &&
+                (it.id === undefined || p.it.id !== undefined));
+        if (conflict) {
+            ambiguous.push(it);
+            candidates.forEach(b => blocked.add(b));
+            return;
+        }
+        used.add(b);
         const textChanged = normWs(it.text) !== normWs(b.text);
-        const speakerChanged = TITR_KINDS.has(b.kind) && it.speaker && normWs(it.speaker) !== normWs(b.speaker);
-        const roleChanged = TITR_KINDS.has(b.kind) && it.role && normWs(it.role) !== normWs(b.role);
+        const speakerChanged = TITR_KINDS.has(b.kind) && typeof it.speaker === "string" && normWs(it.speaker) !== normWs(b.speaker);
+        const roleChanged = TITR_KINDS.has(b.kind) && typeof it.role === "string" && normWs(it.role) !== normWs(b.role);
         rows.push({ b, it, removed: false, changed: textChanged || speakerChanged || roleChanged,
                     textChanged, speakerChanged, roleChanged });
     });
-    state.blocks.forEach(b => { if (!used.has(b.id)) rows.push({ b, it: null, removed: false, changed: false, missing: true }); });
+    state.blocks.forEach(b => {
+        if (!used.has(b)) rows.push({ b, it: null, removed: false, changed: false,
+            missing: !blocked.has(b), ambiguous: blocked.has(b) });
+    });
     rows.sort((x, y) => state.blocks.indexOf(x.b) - state.blocks.indexOf(y.b));
-    return { rows, fresh, unknown: parsed.unknown || [] };
+    return { rows, fresh, ambiguous, unknown: parsed.unknown || [], storyId, snapshot: serializeDoc(), blocks: state.blocks };
 }
 function openWordReview(parsed) {
     wordPlan = buildWordPlan(parsed);
@@ -2254,14 +2520,15 @@ function renderWordReview() {
     const p = wordPlan;
     $("wmSummary").textContent =
         "Изменено: " + wmChangedCount() + "  ·  без изменений: " +
-        p.rows.filter(r => !r.changed && !r.removed && !r.missing).length +
+        p.rows.filter(r => !r.changed && !r.removed && !r.missing && !r.ambiguous).length +
         "  ·  нет в Word: " + p.rows.filter(r => r.missing).length +
-        "  ·  новых в Word (не импортируются): " + p.fresh.length;
+        "  ·  без соответствия (не импортируются): " + p.fresh.length +
+        "  ·  неоднозначных (не импортируются): " + p.ambiguous.length;
     const onlyChanged = $("wmOnlyChanged").checked;
     const host = $("wmList");
     host.innerHTML = "";
     p.rows.forEach((r, ri) => {
-        if (onlyChanged && !r.changed && !r.missing) return;
+        if (onlyChanged && !r.changed && !r.missing && !r.ambiguous) return;
         const el = document.createElement("div");
         el.className = "wm-row" + (r.changed ? " ch" : "") + (r.missing ? " miss" : "");
         const title = blockTitle(r.b, typeNumbers()[r.b.id]);
@@ -2272,7 +2539,7 @@ function renderWordReview() {
         el.innerHTML = `
             <div class="wm-row-head">
                 <span class="wm-title">${esc(title)}</span>
-                <span class="wm-tag">${r.missing ? "нет в правке Word" : bits.length ? esc(bits.join(" · ")) : "без изменений"}</span>
+                <span class="wm-tag">${r.ambiguous ? "неоднозначное соответствие — не импортируется" : r.missing ? "нет в правке Word" : bits.length ? esc(bits.join(" · ")) : "без изменений"}</span>
                 ${r.missing ? `<label class="wm-del"><input type="checkbox" data-wm="del" data-ri="${ri}"> удалить блок</label>` : ""}
                 <span class="spacer"></span>
                 <button class="icon-btn" data-wm="exp" title="Показать/скрыть тексты">…</button>
@@ -2300,9 +2567,15 @@ function updateWmApply() {
     btn.disabled = !(wmChangedCount() + nDel);
     btn.textContent = nDel ? "Применить (тексты + удалить " + nDel + ")" : "Применить";
 }
-$("wmApply").onclick = () => {
+function applyWordReview() {
     if (!wordPlan) return;
-    const nums = typeNumbers();
+    if (wordPlan.storyId !== currentStoryId() || wordPlan.blocks !== state.blocks ||
+        wordPlan.snapshot !== serializeDoc()) {
+        closeWordReview();
+        return toast("Сюжет изменился — откройте правки Word заново", "warn");
+    }
+    if (!wordPlan.rows.some(r => r.changed || r.removed)) return;
+    histBefore();
     let upd = 0;
     const toDelete = [];
     wordPlan.rows.forEach(r => {
@@ -2318,7 +2591,8 @@ $("wmApply").onclick = () => {
     renderBlocks(); saveState();
     toast("Правки применены: обновлено " + upd + " блок(ов)" +
           (toDelete.length ? ", удалено " + toDelete.length : ""), "ok");
-};
+}
+$("wmApply").onclick = applyWordReview;
 $("wmCancel").onclick = closeWordReview;
 $("wmClose").onclick = closeWordReview;
 $("wmOnlyChanged").onchange = renderWordReview;
@@ -2338,25 +2612,27 @@ if (savedDir)
     $("folderName").textContent = `«${savedDir}»`;
 restoreDirHandle();
 $("quotaSave").onclick = () => saveDraft();
-$("quotaDump").onclick = async () => {      /* диагностика + аварийный снимок — открыть/прислать для разбора */
-    const u = lsUsage();
-    const diag = {
-        at: new Date().toISOString(),
-        idb: { ok: !!window.SS_IDB_OK },
-        ls: { totalKB: Math.round(u.total / 1024), top: u.top.map(x => x[0] + " ≈" + Math.round(x[1] / 1024) + "K") },
-        migrated: !!window.SS_LS_MIGRATED,
-        quotaShown: quotaWarnShown,
-    };
-    let stories = null;
+$("quotaDump").onclick = async () => {
+    if (window.OC && typeof ocFlushNow === "function") ocFlushNow();
+    const memory = window.OC ? JSON.parse(JSON.stringify({ stories: OC.stories, activeId: OC.activeId,
+        blocks: state.blocks, nextId: state.nextId, req: typeof ocReadReq === "function" && OC.stories.length ? ocReadReq() : {} })) : null;
+    const diag = { at: new Date().toISOString(), idb: { ok: !!window.SS_IDB_OK },
+        migrated: !!window.SS_LS_MIGRATED, quotaShown: quotaWarnShown };
+    const local = {}, persisted = {};
     try {
-        stories = await IDB.get("kv", "oc_stories");
-        diag.idb.active = (await IDB.get("kv", "oc_active")) || null;
-    } catch (e) { diag.idb.error = String((e && e.name) || e); }
-    if (!Array.isArray(stories) && window.OC && Array.isArray(OC.stories)) stories = OC.stories;
-    if (Array.isArray(stories)) {
-        diag.stories = { count: stories.length, titles: stories.map(s => s.title).slice(0, 80) };
-    } else diag.stories = null;
-    download("ss-storage-dump.json",
-        JSON.stringify({ diag, stories: stories || null }, null, 1), "application/json");
-    toast("Снимок сохранён: сюжеты в IDB — " + (Array.isArray(stories) ? stories.length + " шт." : "нет данных"), "ok", 5000);
+        diag.ls = lsUsage();
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key.startsWith("oc_recovery_") && !["oc_stories", "oc_active", "ss_blocks", "ss_nextId", "ss_req"].includes(key)) continue;
+            const raw = localStorage.getItem(key);
+            try { local[key] = JSON.parse(raw); } catch (e) { local[key] = raw; }
+        }
+    } catch (e) { diag.lsError = String(e.message || e); }
+    for (const key of ["oc_snapshot", "oc_snapshot_backup", "oc_stories", "oc_active"]) {
+        try { persisted[key] = await IDB.read("kv", key); }
+        catch (e) { persisted[key] = { error: String(e.message || e) }; }
+    }
+    const stories = memory && memory.stories || persisted.oc_snapshot && persisted.oc_snapshot.stories || local.oc_stories || null;
+    download("ss-storage-dump.json", JSON.stringify({ diag, stories, memory, persisted, local }, null, 1), "application/json");
+    toast("Снимок выгружен: текущая работа, IDB, резерв и recovery-копии", "ok", 5000);
 };

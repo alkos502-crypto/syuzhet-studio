@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>МЕДИАЦЕНТР — Stories</title>
+<script src="js/theme.js"></script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -16,6 +17,13 @@
         <button class="gn active" id="gnStory">Story</button>
     </nav>
     <span class="spacer"></span>
+    <label class="theme-control" for="themeSelect">Тема
+        <select id="themeSelect" title="Тема интерфейса">
+            <option value="dark">Тёмная</option>
+            <option value="light">Светлая</option>
+            <option value="system">Системная</option>
+        </select>
+    </label>
     <button class="ib" id="ocBell" title="Уведомления">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
     </button>
@@ -90,6 +98,7 @@
         <!-- ------------------ SCRIPT ------------------ -->
         <div class="cview" id="view-script" role="tabpanel">
             <div id="scriptToolbar">
+                <button id="btnAddBlock" class="accent" type="button" aria-haspopup="menu" aria-expanded="false" title="Добавить блок в конец сценария">+ Блок</button>
                 <button id="btnUndoTb" class="ib" title="Отменить (Ctrl+Z)">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3.5 13a9 9 0 1 0 2.3-6.4L3 9"/></svg>
                 </button>
@@ -210,9 +219,17 @@
                         <span class="tsep"></span>
                         <button id="btnSetIn" class="mark in" title="Поставить In (I)" aria-label="Поставить In">{ In</button>
                         <button id="btnSetOut" class="mark out" title="Поставить Out (O)" aria-label="Поставить Out">Out }</button>
-                        <span id="curBlock" class="cur-block" title="Блок-цель кнопки «В сценарий →» (кликните в блок, чтобы сменить)"></span>
-                        <button id="btnSend" class="accent" title="Отправить фрагмент In→Out в текущий блок сценария">Send →</button>
                         <button id="btnClearMarks" class="ti" title="Сбросить к краям файла" aria-label="Сбросить метки In/Out"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+                    </div>
+                    <div class="mark-summary" aria-label="Выбранный диапазон">
+                        <span>In <b id="markInTc">—</b></span>
+                        <span>Out <b id="markOutTc">—</b></span>
+                        <span title="Длительность выбранного фрагмента">Duration <b id="markDuration">—</b></span>
+                    </div>
+                    <div class="transport send-row">
+                        <span id="curBlock" class="cur-block" title="Блок назначения: выберите поле в нужном блоке"></span>
+                        <button id="btnSend" class="accent" aria-describedby="sendHint" disabled>Send →</button>
+                        <span id="sendHint" role="status" aria-live="polite">Выберите блок сценария и исходный файл.</span>
                     </div>
                 </div>
             </div>
