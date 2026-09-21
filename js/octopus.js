@@ -1074,6 +1074,24 @@ async function ocInit() {
     $("workspace").inert = false;
     if (needsChoice) quotaWarn("Версия выбрана; остальные копии сохранены. Сохраните черновик/снимок перед дальнейшей работой.");
 }
+/* ---------- версия сборки ---------- */
+/* Файл VERSION в корне — единый источник номера (его же читает make-win.sh и тег git).
+   Показ в статус-баре и заголовке окна: если файл не прочитается (напр., открыт не
+   через сервер), остаётся «—» и ничего не ломается. */
+function loadVersion() {
+    if (typeof fetch !== "function") return;   /* тесты/окружения без fetch — тихо */
+    fetch("VERSION", { cache: "no-store" })
+        .then(r => (r.ok ? r.text() : Promise.reject(new Error("нет VERSION"))))
+        .then(t => {
+            const v = String(t || "").trim();
+            if (!v) return;
+            const el = $("ocVersion");
+            if (el) el.textContent = v;
+            document.title = "МЕДИАЦЕНТР — Stories · " + v;
+        })
+        .catch(() => {});
+}
 ocInit().catch(e => {
     quotaWarn("Загрузка остановлена: " + (e.message || e) + ". Перезагрузите страницу; исходные копии не удалены.");
 });
+loadVersion();

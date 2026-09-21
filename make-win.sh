@@ -5,7 +5,7 @@ set -e
 SRC="$(cd "$(dirname "$0")" && pwd)"
 WIN="$SRC/../Сюжет-Студия-Windows"
 mkdir -p "$WIN/css" "$WIN/js"
-cp "$SRC/index.html" "$SRC/server.py" "$SRC/names.json" "$WIN/"
+cp "$SRC/index.html" "$SRC/server.py" "$SRC/names.json" "$SRC/VERSION" "$WIN/"
 cp "$SRC/css/style.css" "$WIN/css/"
 cp "$SRC/js/app.js" "$WIN/js/"
 cp "$SRC/js/octopus.js" "$WIN/js/"
