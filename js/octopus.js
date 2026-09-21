@@ -474,12 +474,21 @@ function renderTotal() {
     const tEl = $("ocTotal");
     tEl.textContent = mmss(total);
     tEl.classList.toggle("over", st.targetSec > 0 && total > st.targetSec);
+    tEl.title = state.blocks.length ? "Клик — перейти к первому блоку сценария" : "";
+    tEl.classList.toggle("clickable", !!state.blocks.length);
     const pl = $("ocTotalPlan");
     if (!pl) return;
     pl.hidden = false;
     pl.innerHTML = (st.targetSec > 0 ? "plan " + mmss(st.targetSec) : "set plan") + " " + icon("pencil",11);
     pl.title = "Хронометраж-цель сюжета — клик, чтобы изменить (мм:сс)";
 }
+/* TOTAL — навигация к началу сценария (кликабельная строка в статус-баре) */
+$("ocTotal").onclick = () => {
+    if (!state.blocks.length) return;
+    switchCenterTab("script");
+    const el = document.querySelector('#blocks .doc-block[data-id="' + state.blocks[0].id + '"]');
+    if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
+};
 $("ocTotalPlan").onclick = async () => {
     const st = active();
     const v = await ask("Хронометраж-план", { value: st.targetSec > 0 ? mmss(st.targetSec) : "",
@@ -603,24 +612,70 @@ function renderGraphics() {
 }
 
 /* ---------- APPROVAL ---------- */
+/* Чек-лист выхода: отметки хранятся в сюжете (st.approval = {word, wordImport, fish, mogrt}).
+   Не является моделью данных движка — только UI-состояние панели. */
+const APPROVAL_CHECKS = [
+    ["word",  "Word — текст на вычитку"],
+    ["wordImport", "Word — правки редактора вернуты"],
+    ["fish",  "Fish Cutter — файлы и таймкоды"],
+    ["mogrt", "MOGRT — титры"],
+];
+function approvalState() {
+    const st = active();
+    if (!st.approval || typeof st.approval !== "object") st.approval = {};
+    return st.approval;
+}
 function renderApproval() {
+    const st = active();
+    const ap = approvalState();
+    const checkRow = (key, label) => `<label class="ap-check"><input type="checkbox" data-apc="${key}" ${ap[key] ? "checked" : ""}> ${esc(label)}</label>`;
+    const doneCount = APPROVAL_CHECKS.filter(([k]) => ap[k]).length;
     $("ocApproval").innerHTML = `<div id="approvalSteps">
+        <div class="ap-summary">${doneCount} / ${APPROVAL_CHECKS.length} шагов выхода готово</div>
         <div class="ap-row"><span class="ap-num">1</span><span class="ap-main"><b>Экспорт в Word</b>
             <span>Отдать текст на вычитку (без таймкодов)</span></span>
-            <button class="accent" data-ap="doc">Экспорт</button></div>
+            <button class="accent" data-ap="doc">Экспорт</button>
+            ${checkRow("word", "выдано")}</div>
         <div class="ap-row"><span class="ap-num">2</span><span class="ap-main"><b>Импорт из Word</b>
             <span>Вернуть редактуру в сюжет, обзор «было/стало»</span></span>
-            <button data-ap="imp">Импорт</button></div>
+            <button data-ap="imp">Импорт</button>
+            ${checkRow("wordImport", "правки вернуты")}</div>
         <div class="ap-row"><span class="ap-num">3</span><span class="ap-main"><b>В рыбособиратель</b>
             <span>Файлы и таймкоды для сборки сюжета (CSV «;», есть вариант для Excel в меню «Проект»)</span></span>
-            <button class="accent" data-ap="csv">Экспорт</button></div>
+            <button class="accent" data-ap="csv">Экспорт</button>
+            ${checkRow("fish", "CSV собран")}</div>
         <div class="ap-row"><span class="ap-num">4</span><span class="ap-main"><b>MOGRT титры</b>
             <span>Двухколоночный CSV «Имя Фамилия;Должность» — для плагина Lower Thirds Generator (расстановка плашек маркерами или подряд)</span></span>
-            <button data-ap="mogrt">Экспорт</button></div>
+            <button data-ap="mogrt">Экспорт</button>
+            ${checkRow("mogrt", "титры выгружены")}</div>
+        <div class="ap-row ap-all"><span class="ap-num">🡇</span><span class="ap-main"><b>Экспортировать всё разом</b>
+            <span>Word + CSV «;» + MOGRT в одном .zip (для быстрой сдачи пакета)</span></span>
+            <button data-ap="all" class="accent">Скачать zip</button></div>
     </div>`;
     const act = { doc: exportWord, imp: importWord,
-                  csv: () => exportCsv(";"), mogrt: () => exportMogrt() };
+                  csv: () => exportCsv(";"), mogrt: () => exportMogrt(),
+                  all: exportAllZip };
     $("ocApproval").querySelectorAll("[data-ap]").forEach(b => b.onclick = act[b.dataset.ap]);
+    $("ocApproval").querySelectorAll("[data-apc]").forEach(b => {
+        b.onchange = () => {
+            ap[b.dataset.apc] = b.checked;
+            ocFlushNow(); renderApproval();
+        };
+    });
+}
+
+/* Батч-экспорт: Word + Fish CSV + MOGRT одним .zip (без зависимостей, store-метод как у word) */
+function exportAllZip() {
+    if (!state.blocks.length) return toast("Сценарий пуст", "err");
+    const base = slug($("storyTitle").value) || "сюжет";
+    const files = [
+        { name: base + "_для_редактора.docx", data: buildDocx() },
+        { name: base + "_fishcutter.csv",     data: buildCsv(";") },
+    ];
+    if (state.blocks.some(b => TITR_KINDS.has(b.kind) && b.speaker))
+        files.push({ name: base + "_mogrt.csv", data: buildMogrtCsv() });
+    download(base + "_пакет.zip", zipStore(files), "application/zip");
+    toast("Пакет собран: Word, CSV и MOGRT (если есть титры) — в одном zip", "ok");
 }
 
 /* ---------- SUMMARY / SOURCES / SOCIAL ---------- */
@@ -751,7 +806,10 @@ const PJ_ITEMS = [
     { act: "open", lbl: "📂 Открыть…",       title: "Загрузить черновик из файла .json — вернутся блоки, реквизиты и fps", fn: () => loadDraft() },
     { act: "save", lbl: "💾 Сохранить…",     title: "Сохранить текущий сюжет в файл-черновик .json и продолжить позже", fn: () => saveDraft() },
     { sep: true },
-    { sep: true },
+    { act: "open", lbl: "📂 Открыть…",       title: "Загрузить черновик из файла .json — вернутся блоки, реквизиты и fps", fn: () => loadDraft() },
+    { act: "save", lbl: "💾 Сохранить…",     title: "Сохранить текущий сюжет в файл-черновик .json и продолжить позже", fn: () => saveDraft() },
+    { act: "backupAll", lbl: "🗄 Сохранить все сюжеты…", title: "Полная резервная копия всех сюжетов этого браузера в один .json (с этапами и комментариями) — для переноса или страховки", fn: () => saveAllStories() },
+    { act: "restoreAll", lbl: "📦 Восстановить из резерва…", title: "Загрузить полную резервную копию всех сюжетов (заменяет список — сохраните текущий черновик заранее)", fn: () => restoreAllStories() },
     { act: "wimp", lbl: "📥 Импорт из Word…", title: "Вернуть правки редактора из его Word-файла (.doc/.docx/.txt), обзор «было/стало»", fn: () => importWord() },
     { act: "wexp", lbl: "📤 Экспорт в Word",  title: "Текст сценария без файлов и таймкодов — для редактора", fn: () => exportWord() },
     { sep: true },
@@ -760,6 +818,46 @@ const PJ_ITEMS = [
     { act: "mog",  lbl: "🎬 MOGRT титры",     title: "CSV «Имя Фамилия;Должность» (капсом) — для плагина Premiere Lower Thirds Generator", fn: () => exportMogrt() },
 ];
 function closeProjMenu() { const m = $("projMenu"); if (m) m.remove(); $("gnProject").classList.remove("active"); }
+
+/* полная резервная копия всех сюжетов (этапы, комментарии, approval)
+   и восстановление из неё с подтверждением */
+function saveAllStories() {
+    ocFlushNow();
+    const data = { version: 1, at: new Date().toISOString(),
+                   stories: OC.stories.map(s => JSON.parse(JSON.stringify(s))) };
+    download("медиацентр_все_сюжеты.json", JSON.stringify(data, null, 1), "application/json");
+    toast("Резервная копия всех сюжетов выгружена (" + OC.stories.length + ")", "ok");
+}
+async function restoreAllStories() {
+    if (!(await confirm2("Восстановить из резерва?",
+        "Список сюжетов этого браузера будет заменён данными из файла. Текущую работу лучше сохранить черновиком заранее (💾 Сохранить…).")))
+        return;
+    $("backupFile").click();
+}
+$("backupFile").onchange = e => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+        try {
+            const data = JSON.parse(rd.result);
+            const stories = data && Array.isArray(data.stories) ? data.stories
+                : (Array.isArray(data) ? data : null);
+            if (!stories || !stories.length || !stories.every(s => s && Number.isFinite(s.id) && Array.isArray(s.blocks)))
+                throw new Error("в файле нет сюжетов");
+            ocFlushNow();
+            OC.stories = stories;
+            OC.nextNum = Math.max(OC.nextNum, ...stories.map(s => (s.id || 0) + 1));
+            loadStory(OC.stories[0].id);
+            persistStories(); renderHead(); ocRefreshAll();
+            toast("Восстановлено сюжетов: " + stories.length, "ok");
+        } catch (err) {
+            toast("Файл не похож на резервную копию: " + err.message, "err");
+        }
+    };
+    rd.readAsText(f);
+};
 $("gnProject").onclick = e => {
     e.stopPropagation();
     if ($("projMenu")) { closeProjMenu(); return; }
@@ -797,6 +895,10 @@ function toggleKeys() { $("keysModal").hidden ? openKeys() : closeKeys(); }
 $("kmClose").onclick = closeKeys;
 $("keysModal").addEventListener("click", e => { if (e.target === $("keysModal")) closeKeys(); });
 $("ocHelp").onclick = toggleKeys;
+$("keysModal").addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeKeys(); }
+    else if (e.key === "Tab") trapTab($("keysModal").querySelector(".modal-box"), e);
+});
 
 /* ---------- палитра команд (Ctrl+K) ---------- */
 let cpSel = 0, cpShown = [];
@@ -813,7 +915,11 @@ function cpItems() {
     PJ_ITEMS.forEach(it => { if (!it.sep) items.push({ g: "Команда", t: it.lbl, h: it.title, run: it.fn }); });
     items.push({ g: "Команда", t: "🔍 Поиск по сюжету", h: "Ctrl+F", run: () => openSearch() });
     items.push({ g: "Команда", t: "📁 Папка исходников…", h: "выбор папки; перечитать — ⟳ в Media Browser", run: () => pickFolder() });
-    items.push({ g: "Команда", t: "⚙ Настройки сюжета", h: "FPS и темп чтеца", run: openSetup });
+    items.push({ g: "Команда", t: "⚙ Настройки сюжета", h: "FPS, темп чтеца и размер текста блоков", run: openSetup });
+    items.push({ g: "Команда", t: "Aa Текст блоков крупнее", h: "Alt + «+»", run: () => applyDocFs(docFs() + 1, true) });
+    items.push({ g: "Команда", t: "Aa Текст блоков мельче", h: "Alt + «−»", run: () => applyDocFs(docFs() - 1, true) });
+    items.push({ g: "Команда", t: "Aa Сбросить размер текста блоков", h: "Alt + «0», по умолчанию 14 px",
+        run: () => applyDocFs(DOC_FS_DEF, true) });
     items.push({ g: "Команда", t: "⤡ Свернуть / развернуть все блоки", h: null, run: () => $("btnFoldAll").click() });
     items.push({ g: "Команда", t: "⌨ Горячие клавиши", h: "?", run: openKeys });
     return items;
@@ -857,6 +963,9 @@ $("cpInput").addEventListener("keydown", e => {
     else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cpClose(); }
 });
 $("cmdPalette").addEventListener("click", e => { if (e.target === $("cmdPalette")) cpClose(); });
+$("cmdPalette").addEventListener("keydown", e => {
+    if (e.key === "Tab") trapTab($("cmdPalette").querySelector(".modal-box"), e);
+});
 document.addEventListener("keydown", e => {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && /^(k|л)$/i.test(e.key) &&
         $("askModal").hidden && $("namesModal").hidden) {

@@ -74,6 +74,7 @@
             <div class="sh-actions">
                 <input type="file" id="draftFile" accept=".json" hidden>
                 <input type="file" id="wordFile" accept=".doc,.docx,.htm,.html,.txt" hidden>
+                <input type="file" id="backupFile" accept=".json" hidden>
             </div>
         </div>
     </div>
@@ -374,7 +375,7 @@
     </div>
 </div>
 
-<!-- ====== настройки сюжета: FPS и темп чтеца ====== -->
+<!-- ====== настройки сюжета: FPS, темп чтеца и размер текста блоков ====== -->
 <div id="setupModal" class="modal" hidden>
     <div class="modal-box ask-box">
         <div class="modal-head">
@@ -392,6 +393,12 @@
             <input id="readSpeed" type="number" min="60" max="2400" step="10" value="540" class="sh-num"
                    title="Темп чтеца, зн/мин — для оценки хронометража текстовых блоков (HEADLINE, LEAD, VO) без фрагментов. 540 ≈ телеграфный темп">
             <span class="muted">зн/мин — оценка хроно текстовых блоков</span>
+        </div>
+        <div class="row setup-row">
+            <label for="docFont">TEXT</label>
+            <input id="docFont" type="range" min="10" max="28" step="1" value="14"
+                   title="Кегль текста блоков, px — только отображение на экране: не влияет на экспорт Word и черновик">
+            <span class="muted" id="docFsVal">14 px — размер текста блоков (Alt+− / Alt+ +, Alt+0 — сброс)</span>
         </div>
         <div class="row ask-row">
             <span class="spacer"></span>
@@ -414,6 +421,7 @@
                     <div><dt>хед · зк · синх · стенд · лайф · шпи + пробел</dt><dd>новый блок; те же EN: head · vo · sot · standup · nat · spiegel · lead/toss</dd></div>
                     <div><dt><kbd>ПКМ</kbd> по пустому месту</dt><dd>добавить блок (в конец)</dd></div>
                     <div><dt><kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd></dt><dd>переместить блок</dd></div>
+                    <div><dt><kbd>Alt</kbd>+<kbd>+</kbd>/<kbd>−</kbd> · <kbd>Alt</kbd>+<kbd>0</kbd></dt><dd>размер текста блоков ±1 px · сброс (14 px)</dd></div>
                     <div><dt><kbd>Backspace</kbd> в начале строки</dt><dd>слить с предыдущим блоком</dd></div>
                     <div><dt>клик по бейджу / свёрнутой строке</dt><dd>свернуть / развернуть</dd></div>
                     <div><dt>drag файла из Медиабраузера на блок</dt><dd>добавить целый файл в SOT/STANDUP/LIFE/SPIEGEL</dd></div>

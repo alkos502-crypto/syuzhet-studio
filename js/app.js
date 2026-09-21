@@ -1407,6 +1407,36 @@ function autogrow(ta) {
     ta.style.height = "auto";
     ta.style.height = (ta.scrollHeight + 2) + "px";
 }
+
+/* ---------- размер текста блоков: только экран (в черновик и экспорты не входит) ---------- */
+const DOC_FS_MIN = 10, DOC_FS_MAX = 28, DOC_FS_DEF = 14;
+function docFs() {
+    const v = parseInt(store.get("ss_textsize", DOC_FS_DEF), 10);
+    return v >= DOC_FS_MIN && v <= DOC_FS_MAX ? v : DOC_FS_DEF;
+}
+function applyDocFs(v, save) {
+    v = Math.round(+v);
+    if (!(v >= DOC_FS_MIN && v <= DOC_FS_MAX)) v = DOC_FS_DEF;
+    document.documentElement.style.setProperty("--doc-fs", v + "px");
+    const rng = $("docFont");
+    if (rng) rng.value = v;
+    const lbl = $("docFsVal");
+    if (lbl) lbl.textContent = v + " px — размер текста блоков (Alt+− / Alt+ +, Alt+0 — сброс)";
+    if (save) store.set("ss_textsize", v);
+    document.querySelectorAll("#blocks .doc-text").forEach(autogrow);
+    return v;
+}
+applyDocFs(docFs(), false);
+window.addEventListener("storage", e => {
+    if (e.key !== "ss_textsize") return;
+    const v = parseInt(e.newValue, 10);
+    applyDocFs(v >= DOC_FS_MIN && v <= DOC_FS_MAX ? v : DOC_FS_DEF, false);
+});
+const docFsRange = $("docFont");
+if (docFsRange) {
+    docFsRange.addEventListener("input", e => applyDocFs(e.target.value, false));
+    docFsRange.addEventListener("change", e => applyDocFs(e.target.value, true));
+}
 function focusBlock(id, caret) {
     const ta = document.querySelector('.doc-block[data-id="' + id + '"] .doc-text');
     if (!ta) return;
@@ -1846,6 +1876,15 @@ $("btnSend").addEventListener("click", () => {
 document.addEventListener("keydown", e => {
     if (!$("askModal").hidden || !$("setupModal").hidden) return;   /* модалки перехватывают клавиши сами */
     const mod = e.ctrlKey || e.metaKey;
+    /* размер текста блоков: Alt и «+»/«−»/«0» — физические клавиши, работают и в textarea;
+       без Ctrl/Cmd — зум браузера (Ctrl+±) не перехватываем */
+    if (e.altKey && !mod && /^(Minus|NumpadSubtract|Equal|NumpadAdd|Digit0|Numpad0)$/.test(e.code)) {
+        e.preventDefault();
+        const v = docFs();
+        applyDocFs(/Add|Equal/.test(e.code) ? v + 1 :
+                   /Subtract|Minus/.test(e.code) ? v - 1 : DOC_FS_DEF, true);
+        return;
+    }
     if (e.key === "Escape") {
         if (!$("findBar").hidden) { closeSearch(); return; }
         if (!$("wordModal").hidden) { closeWordReview(); return; }

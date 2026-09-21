@@ -185,6 +185,7 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .setup-row { margin: 12px 0 0; gap: 8px; }
 .setup-row label { margin: 0; flex: 0 0 auto; }
 .setup-row .sh-num { width: 110px; font-size: 13px; padding: 4px 8px; text-align: left; }
+.setup-row input[type="range"] { flex: 0 0 150px; accent-color: var(--accent); cursor: pointer; }
 
 /* ---- центральная прокрутка ---- */
 #centerScroll { flex: 1; min-height: 0; overflow-y: auto; }
@@ -295,7 +296,7 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .doc-text {
     display: block; width: 100%; box-sizing: border-box;
     border: none; background: transparent; outline: none; resize: none; overflow: hidden;
-    font-family: inherit; font-size: 14px; line-height: 1.5; color: var(--text);
+    font-family: inherit; font-size: var(--doc-fs, 14px); line-height: 1.5; color: var(--text);
     padding: 2px; min-height: 24px; margin: 0;
 }
 .doc-text::placeholder { color: var(--text3); font-style: italic; }
@@ -448,6 +449,18 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .ap-main { flex: 1; min-width: 0; }
 .ap-main b { display: block; font-size: 13px; }
 .ap-main span { font-size: 11px; color: var(--text2); }
+/* Approval: чек-лист выхода и сводка */
+.ap-summary {
+    font: 600 11px sans-serif; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text2); padding: 2px 0 8px;
+}
+.ap-check {
+    display: inline-flex; align-items: center; gap: 5px; margin: 0 0 0 8px;
+    font-size: 11px; color: var(--text2); cursor: pointer; white-space: nowrap;
+}
+.ap-check input { width: auto; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.ap-check:hover { color: var(--text); }
+.ap-all { border-color: var(--line-h); }
 
 /* ---- монитор ---- */
 /* ============================ МОНИТОР — стиль монитора источника Adobe Premiere ============================ */
@@ -712,12 +725,7 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 }
 .plan-btn:hover { color: var(--text); background: var(--ctl-h); }
 
-/* ============================ ДОБАВЛЕНО: транспорт (скорость/громкость) ============================ */
-.transport select {
-    width: auto; font-size: 11px; padding: 2px 3px;
-    background: var(--pr-btn); border: 1px solid #3d3d3d; color: #ddd; border-radius: var(--r1);
-}
-.transport input[type=range] { width: 64px; padding: 0; accent-color: var(--pr-blue); }
+
 
 /* ============================ ДОБАВЛЕНО: баннер квоты ============================ */
 .quota-banner {
@@ -846,5 +854,4 @@ html[data-theme="light"] .transport button { color: var(--text); }
 html[data-theme="light"] .transport .tsep { background: var(--line); }
 html[data-theme="light"] .transport .mark { border-color: var(--line-h); color: var(--pr-blue); }
 html[data-theme="light"] .transport .mark:hover:not(:disabled) { background: var(--sel); color: var(--accent); }
-html[data-theme="light"] .transport select { border-color: var(--line-h); color: var(--text); }
 html[data-theme="light"] .transport #btnSend { color: var(--on-accent); }
