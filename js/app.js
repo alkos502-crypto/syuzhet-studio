@@ -1986,73 +1986,18 @@ $("findPrev").onclick = () => { gotoFind(-1); $("findInput").focus(); };
 $("findClose").onclick = closeSearch;
 $("btnFind").onclick = () => $("findBar").hidden ? openSearch() : closeSearch();
 
-/* ---------- экспорт: CSV для Fish Cutter (разделитель на выбор, экранирование) ---------- */
+/* ---------- экспорт: CSV для фрагментов видео — чистый, 3 колонки ---------- */
 function buildCsv(sep) {
-    const r = resolveNameValue("fioReporter"), c = resolveNameValue("fioCam"), ed = resolveNameValue("fioEditor");
     const cell = s => {
         s = String(s);
         return (s.includes(sep) || /["\n\r]/.test(s)) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
-    const row = (...cols) => cols.map(cell).join(sep === ";" ? "; " : sep);
-    const L = [];
-    L.push("# Fish Cutter — сценарий, собранный в «Сюжет-Студии»");
-    L.push("# Сюжет: " + ($("storyTitle").value || "—"));
-    L.push("# Корреспондент: " + (r || "—") + "; Оператор: " + (c || "—") + "; Монтажёр: " + (ed || "—"));
-    L.push("# Таймкод: NDF " + fpsVal() + " к/с; Дата: " + new Date().toISOString().slice(0, 10));
-    L.push("#");
-    L.push(row("файл", "вход", "выход", "подпись", "путь"));
-    let voN = 0, suN = 0, syN = 0, liN = 0, hdN = 0;
+    const row = (...cols) => cols.map(c => cell(c)).join(sep === ";" ? "; " : sep);
+    const L = [row("файл", "вход", "выход")];
     state.blocks.forEach(b => {
-        if (b.kind === "headline") {
-            hdN++;
-            L.push("#");
-            L.push("# ——— ЗАГОЛОВОК " + hdN + " ———");
-            b.text.split(/\r?\n/).forEach(t => L.push("# " + t));
-        } else if (b.kind === "vo") {
-            voN++;
-            L.push("#");
-            L.push("# ——— ЗАКАДР " + voN + " ———");
-            b.text.split(/\r?\n/).forEach(t => L.push("# " + t));
-        } else if (b.kind === "standup") {
-            suN++;
-            L.push("#");
-            L.push("# ——— СТЕНДАП " + suN + " ———");
-            b.text.split(/\r?\n/).forEach(t => L.push("# " + t));
-            b.parts.forEach((p, pi) =>
-                L.push(row(p.file, tc(p.in), tc(p.out),
-                           b.parts.length > 1 ? `СТЕНД${suN}-${pi + 1}${b.speaker ? " " + b.speaker : ""}` : `СТЕНД${suN}${b.speaker ? " " + b.speaker : ""}`,
-                           p.path || p.file)));
-        } else if (b.kind === "life") {
-            liN++;
-            L.push("#");
-            L.push("# ——— ЛАЙФ " + liN + " ———");
-            if (b.text) b.text.split(/\r?\n/).forEach(t => L.push("# " + t));
-            b.parts.forEach((p, pi) =>
-                L.push(row(p.file, tc(p.in), tc(p.out),
-                           b.parts.length > 1 ? `ЛАЙФ${liN}-${pi + 1}` : `ЛАЙФ${liN}`,
-                           p.path || p.file)));
-        } else if (b.kind === "spiegel") {
-            L.push("#");
-            L.push("# ——— ШПИГЕЛЬ ———");
-            if (b.text) b.text.split(/\r?\n/).forEach(t => L.push("# " + t));
-            b.parts.forEach((p, pi) =>
-                L.push(row(p.file, tc(p.in), tc(p.out), "ШПИГ", p.path || p.file)));
-        } else if (b.kind === "vod") {
-            L.push("#");
-            L.push("# ——— ПОДВОДКА ———");
-            b.text.split(/\r?\n/).forEach(t => L.push("# " + t));
-        } else {
-            syN++;
-            L.push("#");
-            L.push("# ——— СИНХРОН " + syN + ": " + (b.speaker || "спикер") +
-                   (b.role ? ", " + b.role : "") + " ———");
-            b.text.split(/\r?\n/).forEach(t => L.push("# " + t));
-            b.parts.forEach((p, pi) =>
-                L.push(row(p.file, tc(p.in), tc(p.out), `СИНХ${syN}-${pi + 1} ${b.speaker}`,
-                           p.path || p.file)));
-        }
+        if (b.kind === "headline" || b.kind === "vod") return;
+        b.parts.forEach(p => L.push(row(p.file, tc(p.in), tc(p.out))));
     });
-    /* CSV в кодировке UTF-8 с BOM — Excel и панель читают корректно */
     return "\uFEFF" + L.join("\r\n");
 }
 
