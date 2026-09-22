@@ -2139,19 +2139,23 @@ function buildDocx() {
         if (n < req.length - 1) runs += "<w:r><w:br/></w:r>";
     });
     body += wxPara(runs);
-    let voN = 0, suN = 0, syN = 0, liN = 0, hdN = 0;
     state.blocks.forEach((b, index) => {
         let head, ital = false;
-        if (b.kind === "headline") { hdN++; head = "Заголовок " + hdN; }
-        else if (b.kind === "vo") { voN++; head = "Закадровый текст " + voN; }
-        else if (b.kind === "standup") { suN++; head = "Стендап " + suN + ". " + (b.speaker || "") + (b.role ? ", " + b.role : ""); ital = true; }
-        else if (b.kind === "life") { liN++; head = "Лайф " + liN; ital = true; }
-        else if (b.kind === "spiegel") { head = "Шпигель"; ital = true; }
-        else if (b.kind === "vod") { head = "Подводка"; }
-        else {
-            syN++;
-            head = "Синхрон " + syN + ". " + (b.speaker || "") + (b.role ? ", " + b.role : "");
-            ital = true;
+        switch (b.kind) {
+            case "headline": head = "ТИТР"; break;
+            case "vod":      head = "ПДВ"; break;
+            case "vo":       head = "ЗК"; break;
+            case "sync": {
+                const who = (b.speaker || "") + (b.role ? ", " + b.role : "");
+                head = "СНХ" + ((b.speaker || b.role) ? ". " + who : ""); ital = true; break;
+            }
+            case "standup": {
+                const who = (b.speaker || "") + (b.role ? ", " + b.role : "");
+                head = "СТАП" + ((b.speaker || b.role) ? ". " + who : ""); ital = true; break;
+            }
+            case "life":     head = "ЛАЙФ"; ital = true; break;
+            case "spiegel":  head = "ШПГ"; ital = true; break;
+            default:         head = "ТИТР"; ital = true; break;
         }
         body += wxPara(wxBookmark(wordBookmarkName("SS_B_", b.id), index + 1, wxRun(head)), "Heading2") +
             wxPara(wxRun(b.text, { i: ital }));
@@ -2315,24 +2319,31 @@ $("wordFile").onchange = e => {
 /* заголовки блоков, как их печатает buildDocx (нумерация — по типу) */
 function parseWordHead(h) {
     let m;
-    if ((m = h.match(/^заголовок\s*(\d+)/i)) || (m = h.match(/^headline\s*(\d+)/i)))
-        return { kind: "headline", num: +m[1] };
-    if (/^закадр/i.test(h) || /^зк[\s.]/i.test(h) || /^vo\b/i.test(h)) {
+    if ((m = h.match(/^заголовок\s*(\d+)/i)) || (m = h.match(/^headline\s*(\d+)/i)) || /^титр(?=$|\s|[.．])/i.test(h))
+        return { kind: "headline", num: m ? +m[1] : NaN };
+    if (/^закадр/i.test(h) || /^зк(?=$|[\s.．])/i.test(h) || /^vo\b/i.test(h)) {
         const d = h.match(/\d+/);
         return { kind: "vo", num: d ? +d[0] : NaN };
     }
-    if ((m = h.match(/^стендап\s*(\d+)\s*[.．]?\s*(.*)$/i)) || (m = h.match(/^standup\s*(\d+)\s*[.．]?\s*(.*)$/i))) {
-        const parts = (m[2] || "").split(/[,;]/);
-        return { kind: "standup", num: +m[1],
+    if (/^подвод/i.test(h) || /^lead\b/i.test(h) || /^пдв(?=$|\s|[.．])/i.test(h)) return { kind: "vod" };
+    if ((m = h.match(/^стендап\s*(\d+)\s*[.．]?\s*(.*)$/i)) || (m = h.match(/^standup\s*(\d+)\s*[.．]?\s*(.*)$/i)) ||
+        (m = h.match(/^стап\s*[.．]?\s*(.*)$/i))) {
+        const txt = m[2] !== undefined ? (m[2] || "") : (m[1] || "");
+        const num = m[2] !== undefined ? +m[1] : NaN;
+        const parts = txt.split(/[,;]/);
+        return { kind: "standup", num,
                  speaker: (parts.shift() || "").replace(/^—+\s*/, "").trim(),
                  role: parts.join(", ").trim() };
     }
-    if ((m = h.match(/^лайф\s*(\d+)/i)) || (m = h.match(/^life\s*(\d+)/i))) return { kind: "life", num: +m[1] };
-    if (/^шпигель/i.test(h) || /^spiegel/i.test(h)) return { kind: "spiegel" };
-    if (/^подвод/i.test(h) || /^lead\b/i.test(h)) return { kind: "vod" };
-    if ((m = h.match(/^синхрон\s*(\d+)\s*[.．]?\s*(.*)$/i)) || (m = h.match(/^sot\s*(\d+)\s*[.．]?\s*(.*)$/i))) {
-        const parts = (m[2] || "").split(/[,;]/);
-        return { kind: "sync", num: +m[1],
+    if ((m = h.match(/^лайф\s*(\d+)/i)) || (m = h.match(/^life\s*(\d+)/i)) || /^лайф(?=$|\s|[.．])/i.test(h))
+        return { kind: "life", num: m && m[1] !== undefined ? +m[1] : NaN };
+    if (/^шпигель/i.test(h) || /^spiegel/i.test(h) || /^шпг(?=$|\s|[.．])/i.test(h)) return { kind: "spiegel" };
+    if ((m = h.match(/^синхрон\s*(\d+)\s*[.．]?\s*(.*)$/i)) || (m = h.match(/^sot\s*(\d+)\s*[.．]?\s*(.*)$/i)) ||
+        (m = h.match(/^снх\s*[.．]?\s*(.*)$/i))) {
+        const txt = m[2] !== undefined ? (m[2] || "") : (m[1] || "");
+        const num = m[2] !== undefined ? +m[1] : NaN;
+        const parts = txt.split(/[,;]/);
+        return { kind: "sync", num,
                  speaker: (parts.shift() || "").replace(/^—+\s*/, "").trim(),
                  role: parts.join(", ").trim() };
     }
