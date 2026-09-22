@@ -78,66 +78,107 @@ Public Function SyncFromCsvText(doc As Document, ByVal text As String) As String
         Exit Function
     End If
 
+    ' детект формата: есть ли #-секции
+    Dim hasSections As Boolean: hasSections = False
+    For i = LBound(lines) To UBound(lines)
+        t = Trim$(CStr(lines(i)))
+        If Left$(t, 1) = "#" And InStr(t, ChrW(8212) & ChrW(8212) & ChrW(8212)) > 0 Then
+            hasSections = True: Exit For
+        End If
+    Next i
+
     Dim rows() As SyRow, n As Long
     ReDim rows(0 To 63)
     n = 0
     Dim curKind As String, curNum As Long
     Dim csvFps As String
-    For i = LBound(lines) To UBound(lines)
-        t = Trim$(CStr(lines(i)))
-        If Len(t) = 0 Then GoTo nx
-        If Left$(t, 1) = "#" Then
-            Dim ss As String
-            ss = NormSp(Mid$(t, 2))
-            If StartsWith(ss, "Таймкод:") Then
-                Dim pp As Long, qq As Long, r As String
-                pp = InStr(ss, "NDF ")
-                If pp > 0 Then
-                    r = Mid$(ss, pp + 4)
-                    qq = InStr(r, " ")
-                    If qq > 0 Then r = Left$(r, qq - 1)
-                    If Len(r) > 0 Then csvFps = r
+
+    If hasSections Then
+        ' --- формат с #-секциями (старый) ---
+        For i = LBound(lines) To UBound(lines)
+            t = Trim$(CStr(lines(i)))
+            If Len(t) = 0 Then GoTo nxSec
+            If Left$(t, 1) = "#" Then
+                Dim ss As String
+                ss = NormSp(Mid$(t, 2))
+                If StartsWith(ss, "Таймкод:") Then
+                    Dim pp As Long, qq As Long, r As String
+                    pp = InStr(ss, "NDF ")
+                    If pp > 0 Then
+                        r = Mid$(ss, pp + 4)
+                        qq = InStr(r, " ")
+                        If qq > 0 Then r = Left$(r, qq - 1)
+                        If Len(r) > 0 Then csvFps = r
+                    End If
                 End If
-            End If
-            If InStr(t, ChrW(8212) & ChrW(8212) & ChrW(8212)) > 0 Then
-                curKind = "": curNum = 0
-                Dim sec As String, p1 As Long
-                sec = Mid$(t, 7)
-                p1 = InStr(sec, ChrW(8212) & ChrW(8212) & ChrW(8212))
-                If p1 > 0 Then sec = Trim$(Left$(sec, p1 - 1)) Else sec = ""
-                Dim l As String: l = LCase$(sec)
-                Dim tail As String
-                If StartsWith(l, "синхрон") Then
-                    tail = Mid$(l, 8): curKind = "sync": curNum = FirstNum(tail)
-                ElseIf StartsWith(l, "стендап") Then
-                    curKind = "standup": curNum = FirstNum(Mid$(l, 9))
-                ElseIf StartsWith(l, "лайф") Then
-                    curKind = "life": curNum = FirstNum(Mid$(l, 5))
-                ElseIf StartsWith(l, "шпигель") Then
-                    curKind = "spiegel": curNum = 1
-                Else
-                    curKind = ""   '/заголовок, закодр, подводка — текстовые/
+                If InStr(t, ChrW(8212) & ChrW(8212) & ChrW(8212)) > 0 Then
+                    curKind = "": curNum = 0
+                    Dim sec As String, p1 As Long
+                    sec = Mid$(t, 7)
+                    p1 = InStr(sec, ChrW(8212) & ChrW(8212) & ChrW(8212))
+                    If p1 > 0 Then sec = Trim$(Left$(sec, p1 - 1)) Else sec = ""
+                    Dim l As String: l = LCase$(sec)
+                    Dim tail As String
+                    If StartsWith(l, "синхрон") Then
+                        tail = Mid$(l, 8): curKind = "sync": curNum = FirstNum(tail)
+                    ElseIf StartsWith(l, "стендап") Then
+                        curKind = "standup": curNum = FirstNum(Mid$(l, 9))
+                    ElseIf StartsWith(l, "лайф") Then
+                        curKind = "life": curNum = FirstNum(Mid$(l, 5))
+                    ElseIf StartsWith(l, "шпигель") Then
+                        curKind = "spiegel": curNum = 1
+                    Else
+                        curKind = ""
+                    End If
                 End If
+                GoTo nxSec
             End If
-            GoTo nx
-        End If
-        cells = ParseCsvRow(t, sep)
-        If UBound(cells) < 2 Then GoTo nx
-        If cells(0) = "файл" Or cells(0) = "№" Then GoTo nx
-        If Len(curKind) = 0 Then
-            notes = notes & "Строка без раздела: " & Left$(t, 40) & vbLf
-            GoTo nx
-        End If
-        If n > UBound(rows) Then ReDim Preserve rows(0 To n * 2)
-        rows(n).kind = curKind
-        rows(n).num = curNum
-        rows(n).file = CStr(cells(0))
-        rows(n).tin = CStr(cells(1))
-        rows(n).tout = CStr(cells(2))
-        If UBound(cells) >= 4 Then rows(n).path = CStr(cells(4)) Else rows(n).path = CStr(cells(0))
-        n = n + 1
-nx:
-    Next i
+            cells = ParseCsvRow(t, sep)
+            If UBound(cells) < 2 Then GoTo nxSec
+            If cells(0) = "файл" Or cells(0) = "№" Then GoTo nxSec
+            If Len(curKind) = 0 Then
+                notes = notes & "Строка без раздела: " & Left$(t, 40) & vbLf
+                GoTo nxSec
+            End If
+            If n > UBound(rows) Then ReDim Preserve rows(0 To n * 2)
+            rows(n).kind = curKind: rows(n).num = curNum
+            rows(n).file = CStr(cells(0)): rows(n).tin = CStr(cells(1))
+            rows(n).tout = CStr(cells(2))
+            If UBound(cells) >= 4 Then rows(n).path = CStr(cells(4)) Else rows(n).path = CStr(cells(0))
+            n = n + 1
+nxSec:
+        Next i
+    Else
+        ' --- чистый формат (без секций) — распределяем по блокам с фрагментами ---
+        Dim fragBlockIdx As Long: fragBlockIdx = 0
+        For i = LBound(lines) To UBound(lines)
+            t = Trim$(CStr(lines(i)))
+            If Len(t) = 0 Then GoTo nxFlat
+            If Left$(t, 1) = "#" Then GoTo nxFlat
+            cells = ParseCsvRow(t, sep)
+            If UBound(cells) < 2 Then GoTo nxFlat
+            If cells(0) = "файл" Or cells(0) = "№" Then GoTo nxFlat
+
+            ' найти следующий блок, у которого может быть фрагмент
+            Do While fragBlockIdx < NBlk
+                Dim fb As Blk: fb = BlkArr(fragBlockIdx)
+                If fb.kind <> "headline" And fb.kind <> "vo" And fb.kind <> "vod" Then Exit Do
+                fragBlockIdx = fragBlockIdx + 1
+            Loop
+            If fragBlockIdx >= NBlk Then
+                notes = notes & "Фрагмент «" & Left$(t, 40) & "» — нет подходящего блока" & vbLf
+                GoTo nxFlat
+            End If
+            If n > UBound(rows) Then ReDim Preserve rows(0 To n * 2)
+            rows(n).kind = BlkArr(fragBlockIdx).kind
+            rows(n).num = BlkArr(fragBlockIdx).num
+            rows(n).file = CStr(cells(0)): rows(n).tin = CStr(cells(1))
+            rows(n).tout = CStr(cells(2))
+            rows(n).path = CStr(cells(0))
+            n = n + 1
+nxFlat:
+        Next i
+    End If
 
     If Len(csvFps) > 0 Then
         If LCase$(csvFps) <> LCase$(FpsS) Then

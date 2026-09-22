@@ -48,52 +48,10 @@ def row(sep, *cols):
 
 def build_fish(sep):
     L = []
-    L.append("# Fish Cutter — сценарий, собранный в «Сюжет-Word»")
-    L.append("# Сюжет: " + (TITLE or "—"))
-    L.append("# Корреспондент: %s; Оператор: %s; Монтажёр: %s" % REQ)
-    L.append("# Таймкод: NDF %s к/с; Дата: %s" % (FPS, DATE))
-    L.append("#")
-    L.append(row(sep, "файл", "вход", "выход", "подпись", "путь"))
-    hd = vo = su = sy = li = 0
+    L.append(row(sep, "файл", "вход", "выход"))
     for kind, meta, text, parts in B:
-        if kind == "headline":
-            hd += 1
-            L.append("#"); L.append("# ——— ЗАГОЛОВОК %d ———" % hd)
-            L += ["# " + t for t in (text or [""])]
-        elif kind == "vo":
-            vo += 1
-            L.append("#"); L.append("# ——— ЗАКАД %d ———" % vo)
-            L += ["# " + t for t in (text or [""])]
-        elif kind == "vod":
-            L.append("#"); L.append("# ——— ПОДВОДКА ———")
-            L += ["# " + t for t in (text or [""])]
-        elif kind == "standup":
-            su += 1
-            L.append("#"); L.append("# ——— СТЕНДАП %d ———" % su)
-            L += ["# " + t for t in (text or [""])]
-            for pi, p in enumerate(parts):
-                lbl = "СТЕНД%d-%d" % (su, pi + 1) if len(parts) > 1 else "СТЕНД%d" % su
-                L.append(row(sep, p[0], p[1], p[2], lbl, p[3]))
-        elif kind == "life":
-            li += 1
-            L.append("#"); L.append("# ——— ЛАЙФ %d ———" % li)
-            L += ["# " + t for t in text]
-            for pi, p in enumerate(parts):
-                lbl = "ЛАЙФ%d-%d" % (li, pi + 1) if len(parts) > 1 else "ЛАЙФ%d" % li
-                L.append(row(sep, p[0], p[1], p[2], lbl, p[3]))
-        elif kind == "spiegel":
-            L.append("#"); L.append("# ——— ШПИГЕЛЬ ———")
-            L += ["# " + t for t in text]
-            for p in parts:
-                L.append(row(sep, p[0], p[1], p[2], "ШПИГ", p[3]))
-        else:
-            spk, role = meta
-            sy += 1
-            L.append("#")
-            L.append("# ——— СИНХРОН %d: %s%s ———" % (sy, spk or "спикер", (", " + role) if role else ""))
-            L += ["# " + t for t in (text or [""])]
-            for pi, p in enumerate(parts):
-                L.append(row(sep, p[0], p[1], p[2], "СИНХ%d-%d %s" % (sy, pi + 1, spk), p[3]))
+        for p in parts:
+            L.append(row(sep, p[0], p[1], p[2]))
     return "\ufeff" + "\r\n".join(L)
 
 def build_mogrt(sep=";", blocks=None):
@@ -167,8 +125,8 @@ class GoldenTests(unittest.TestCase):
 
     def test_fish_unchanged(self):
         hashes = {
-            ";": "ab43d127402689a40d0621f9181ab9fa68da40eef50724fced5faad1acfdb673",
-            ",": "b87d5eae21ad06b96118991771d623aa4898d677178e8fbbbfaf18a852a49c26",
+            ";": "f9f7c1aac2ec440b3af30e544aa9acd77a96445c7dcb218a6c4b67f314e03d50",
+            ",": "f39f4863ea893373804fd67d2d49352f7995f1bd96219311806eab44f04da9d0",
         }
         for sep, expected in hashes.items():
             with self.subTest(sep=sep):

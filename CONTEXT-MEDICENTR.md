@@ -369,7 +369,7 @@
    статус-бар) на **английских NLE-терминах**, сообщения (тосты, диалоги,
    подсказки) — русские; `KIND_META.badge` — EN-коды, `.ru` — для экспортов.
 3. Любое изменение в `js/`/`css/`/`index.html` → потом `./make-win.sh`.
-4. Проверка синтаксиса: `node --check js/app.js js/octopus.js`,
+4. Проверка синтаксиса: `deno check js/app.js js/octopus.js js/theme.js`,
    `python3 -m py_compile server.py`.
 5. После деплоя — попросить юзера **Cmd+Shift+R** (жёсткая перезагрузка), т.к.
    старые index.html/js могли закэшироваться вразнобой.

@@ -23,6 +23,10 @@ Private Function Rw(ByVal sep As String, ByVal c1 As String, ByVal c2 As String,
          SepJoin(sep) & Cel(c4, sep) & SepJoin(sep) & Cel(c5, sep)
 End Function
 
+Private Function Rw3(ByVal sep As String, ByVal c1 As String, ByVal c2 As String, ByVal c3 As String) As String
+    Rw3 = Cel(c1, sep) & SepJoin(sep) & Cel(c2, sep) & SepJoin(sep) & Cel(c3, sep)
+End Function
+
 Private Sub AddL(ByRef L As Collection, ByVal s As String)
     L.Add s
 End Sub
@@ -42,66 +46,16 @@ End Sub
 Public Function BuildFish(doc As Document, ByVal sep As String) As String
     Scan doc
     Dim L As New Collection
-    Dim dt As String
-    If Len(ExportDateOverride) > 0 Then dt = ExportDateOverride Else dt = Format(Now, "yyyy-mm-dd")
-
-    AddL L, "# Fish Cutter — сценарий, собранный в «Сюжет-Word»"
-    If Len(Ttl) > 0 Then
-        AddL L, "# Сюжет: " & Ttl
-    Else
-        AddL L, "# Сюжет: —"
-    End If
-    AddL L, "# Корреспондент: " & Dash(Rpt) & "; Оператор: " & Dash(Cam) & _
-            "; Монтажёр: " & Dash(Edt)
-    AddL L, "# Таймкод: NDF " & IIf(Len(FpsS) > 0, FpsS, "25") & " к/с; Дата: " & dt
-    AddL L, "#"
-    AddL L, Rw(sep, "файл", "вход", "выход", "подпись", "путь")
+    AddL L, Rw3(sep, "файл", "вход", "выход")
 
     Dim i As Long, j As Long, b As Blk
     For i = 0 To NBlk - 1
         b = BlkArr(i)
-        Select Case b.kind
-            Case "headline"
-                AddL L, "#": AddL L, "# ——— ЗАГОЛОВОК " & b.num & " ———"
-                AddTextLines L, i, True
-            Case "vo"
-                AddL L, "#": AddL L, "# ——— ЗАКАД " & b.num & " ———"
-                AddTextLines L, i, True
-            Case "vod"
-                AddL L, "#": AddL L, "# ——— ПОДВОДКА ———"
-                AddTextLines L, i, True
-            Case "standup"
-                AddL L, "#": AddL L, "# ——— СТЕНДАП " & b.num & " ———"
-                AddTextLines L, i, True
-                For j = 0 To b.nFrag - 1
-                    Dim suLbl As String
-                    If b.nFrag > 1 Then suLbl = "СТЕНД" & b.num & "-" & (j + 1) Else suLbl = "СТЕНД" & b.num
-                    AddL L, Rw(sep, b.frags(j).file, b.frags(j).tin, b.frags(j).tout, suLbl, b.frags(j).path)
-                Next j
-            Case "life"
-                AddL L, "#": AddL L, "# ——— ЛАЙФ " & b.num & " ———"
-                AddTextLines L, i, False
-                For j = 0 To b.nFrag - 1
-                    Dim liLbl As String
-                    If b.nFrag > 1 Then liLbl = "ЛАЙФ" & b.num & "-" & (j + 1) Else liLbl = "ЛАЙФ" & b.num
-                    AddL L, Rw(sep, b.frags(j).file, b.frags(j).tin, b.frags(j).tout, liLbl, b.frags(j).path)
-                Next j
-            Case "spiegel"
-                AddL L, "#": AddL L, "# ——— ШПИГЕЛЬ ———"
-                AddTextLines L, i, False
-                For j = 0 To b.nFrag - 1
-                    AddL L, Rw(sep, b.frags(j).file, b.frags(j).tin, b.frags(j).tout, "ШПИГ", b.frags(j).path)
-                Next j
-            Case Else  ' sync
-                AddL L, "#": AddL L, "# ——— СИНХРОН " & b.num & ": " & _
-                        IIf(Len(b.speaker) > 0, b.speaker, "спикер") & _
-                        IIf(Len(b.role) > 0, ", " & b.role, "") & " ———"
-                AddTextLines L, i, True
-                For j = 0 To b.nFrag - 1
-                    AddL L, Rw(sep, b.frags(j).file, b.frags(j).tin, b.frags(j).tout, _
-                            "СИНХ" & b.num & "-" & (j + 1) & " " & b.speaker, b.frags(j).path)
-                Next j
-        End Select
+        If b.kind = "headline" Or b.kind = "vod" Then GoTo nx
+        For j = 0 To b.nFrag - 1
+            AddL L, Rw3(sep, b.frags(j).file, b.frags(j).tin, b.frags(j).tout)
+        Next j
+nx:
     Next i
     BuildFish = JoinColl(L, vbCrLf)
 End Function
