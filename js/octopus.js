@@ -641,7 +641,7 @@ function renderApproval() {
             <button data-ap="imp">Импорт</button>
             ${checkRow("wordImport", "правки вернуты")}</div>
         <div class="ap-row"><span class="ap-num">3</span><span class="ap-main"><b>В рыбособиратель</b>
-            <span>Файлы и таймкоды для сборки сюжета (CSV «;», есть вариант для Excel в меню «Проект»)</span></span>
+<span>Фрагменты видео: файл; вход; выход (CSV «;», есть вариант для Excel в меню «Проект»)</span></span>
             <button class="accent" data-ap="csv">Экспорт</button>
             ${checkRow("fish", "CSV собран")}</div>
         <div class="ap-row"><span class="ap-num">4</span><span class="ap-main"><b>MOGRT титры</b>
@@ -806,14 +806,12 @@ const PJ_ITEMS = [
     { act: "open", lbl: "📂 Открыть…",       title: "Загрузить черновик из файла .json — вернутся блоки, реквизиты и fps", fn: () => loadDraft() },
     { act: "save", lbl: "💾 Сохранить…",     title: "Сохранить текущий сюжет в файл-черновик .json и продолжить позже", fn: () => saveDraft() },
     { sep: true },
-    { act: "open", lbl: "📂 Открыть…",       title: "Загрузить черновик из файла .json — вернутся блоки, реквизиты и fps", fn: () => loadDraft() },
-    { act: "save", lbl: "💾 Сохранить…",     title: "Сохранить текущий сюжет в файл-черновик .json и продолжить позже", fn: () => saveDraft() },
     { act: "backupAll", lbl: "🗄 Сохранить все сюжеты…", title: "Полная резервная копия всех сюжетов этого браузера в один .json (с этапами и комментариями) — для переноса или страховки", fn: () => saveAllStories() },
     { act: "restoreAll", lbl: "📦 Восстановить из резерва…", title: "Загрузить полную резервную копию всех сюжетов (заменяет список — сохраните текущий черновик заранее)", fn: () => restoreAllStories() },
     { act: "wimp", lbl: "📥 Импорт из Word…", title: "Вернуть правки редактора из его Word-файла (.doc/.docx/.txt), обзор «было/стало»", fn: () => importWord() },
     { act: "wexp", lbl: "📤 Экспорт в Word",  title: "Текст сценария без файлов и таймкодов — для редактора", fn: () => exportWord() },
     { sep: true },
-    { act: "fish", lbl: "🐟 В рыбособиратель", title: "CSV «;» — файлы и таймкоды для сборки сюжета в Fish Cutter", fn: () => exportCsv(";") },
+    { act: "fish", lbl: "🐟 В рыбособиратель", title: "CSV «;» — фрагменты видео (файл; вход; выход) для Fish Cutter", fn: () => exportCsv(";") },
     { act: "xls",  lbl: "📊 CSV для Excel «,»", title: "Тот же CSV с запятой — для открытия в Excel", fn: () => exportCsv(",") },
     { act: "mog",  lbl: "🎬 MOGRT титры",     title: "CSV «Имя Фамилия;Должность» (капсом) — для плагина Premiere Lower Thirds Generator", fn: () => exportMogrt() },
 ];

@@ -2156,7 +2156,7 @@ function slug(s) {
 function exportCsv(sep) {
     if (!state.blocks.length) return toast("Сценарий пуст", "err");
     download(slug($("storyTitle").value) + "_fishcutter.csv", buildCsv(sep), "text/csv;charset=utf-8");
-    toast("CSV сохранён — откройте его в Fish Cutter («Загрузить файл…»)", "ok");
+    toast("CSV с фрагментами сохранён — по строке на каждый фрагмент (файл; вход; выход)", "ok");
 }
 function exportWord() {
     if (!state.blocks.length) return toast("Сценарий пуст", "err");
