@@ -197,6 +197,11 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     padding: 5px 12px; background: var(--bg-2); border-bottom: 1px solid var(--line);
     flex-wrap: wrap; position: sticky; top: 0; z-index: 5;
 }
+.tb-spacer { flex: 1; }
+.tb-size { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 11px; color: var(--text3); }
+.tb-size span { font: 600 10px var(--mono); color: var(--text3); }
+.tb-size input[type="range"] { width: 90px; accent-color: var(--accent); cursor: pointer; }
+.tb-size b { font: 600 11px var(--mono); color: var(--text2); min-width: 18px; text-align: right; }
 .findbar {
     display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
     background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r1); padding: 5px 8px;

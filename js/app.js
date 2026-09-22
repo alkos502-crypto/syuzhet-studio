@@ -1421,7 +1421,7 @@ function applyDocFs(v, save) {
     const rng = $("docFont");
     if (rng) rng.value = v;
     const lbl = $("docFsVal");
-    if (lbl) lbl.textContent = v + " px — размер текста блоков (Alt+− / Alt+ +, Alt+0 — сброс)";
+if (lbl) lbl.textContent = v;
     if (save) store.set("ss_textsize", v);
     document.querySelectorAll("#blocks .doc-text").forEach(autogrow);
     return v;
