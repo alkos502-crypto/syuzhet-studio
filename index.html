@@ -192,9 +192,10 @@
         <section class="panel-sec" data-panel="monitor">
             <div class="panel-head">
                 <span class="ph-title">Monitor</span>
-                <span id="monFile" class="ph-file" title=""></span>
-                <span class="spacer"></span>
-                <button class="ph-fold" aria-expanded="true" title="Свернуть/развернуть панель">▾</button>
+<span id="monFile" class="ph-file" title=""></span>
+            <span class="spacer"></span>
+            <button id="btnAudioScrub" class="ib" title="Звук при пошаговой подгонке меток (←/→, J/L); Q — услышать позицию" aria-pressed="false">🔊</button>
+            <button class="ph-fold" aria-expanded="true" title="Свернуть/развернуть панель">▾</button>
             </div>
             <div class="panel-body pbb-flush">
                 <div class="monitor">
@@ -455,6 +456,8 @@
                     <div><dt><kbd>I</kbd> / <kbd>O</kbd></dt><dd>поставить In / Out</dd></div>
                     <div><dt><kbd>Shift</kbd>+<kbd>I</kbd>/<kbd>O</kbd></dt><dd>перейти к метке In / Out</dd></div>
                     <div><dt><kbd>P</kbd></dt><dd>зацикленный предпросмотр In→Out</dd></div>
+                    <div><dt><kbd>Q</kbd></dt><dd>«услышать» ~0.45 с звука текущей позиции (точная подгонка I/O)</dd></div>
+                    <div><dt><kbd>🔊</kbd> на мониторе</dt><dd>звук при пошаговой подгонке (кадр/секунда)</dd></div>
                     <div><dt><kbd>Alt</kbd>+<kbd>Enter</kbd> в тексте блока</dt><dd>фрагмент In→Out в блок</dd></div>
                 </dl>
             </section>

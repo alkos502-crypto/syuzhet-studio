@@ -538,6 +538,8 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .ph-fold { background: transparent; border: 1px solid transparent; color: var(--text3); width: 24px; height: 20px; padding: 0; font-size: 11px; }
 .ph-fold:hover { color: var(--text); background: var(--hover); }
 .panel-head button { font-size: 11px; }
+#btnAudioScrub { font-size: 12px; padding: 2px 6px; }
+#btnAudioScrub.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .panel-body { min-height: 0; padding: 8px; }
 .panel-body.pbb-flush { padding: 0; }
 /* свёрнутая панель: шапка без нижней рамки */
