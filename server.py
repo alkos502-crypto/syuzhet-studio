@@ -14,18 +14,21 @@ import shutil
 import socket
 import sys
 import tempfile
+import threading
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-args = [a for a in sys.argv[1:] if a != "--open"]
-OPEN_BROWSER = "--open" in sys.argv[1:]
-PORT = int(args[0]) if args else 8765
 ROOT = os.path.dirname(os.path.abspath(__file__))
 NAMES_FILE = os.path.join(ROOT, "names.json")
 ROLES = ("fioReporter", "fioCam", "fioEditor")
 MAX_PER_ROLE = 200
 MAX_BODY = 64 * 1024
 VKEY = "_v"
+
+# ThreadingHTTPServer обслуживает запросы в потоках; версия «прочитал — сравнил —
+# записал» должна быть атомарной, иначе два одновременных POST с одним _v оба
+# проходят проверку и последний молча затирает первый (потерянное обновление).
+NAMES_LOCK = threading.Lock()
 
 
 def clean_lists(payload):
@@ -63,6 +66,41 @@ def read_names():
         raise ValueError("names.json должен содержать JSON-объект")
     ver = data.get(VKEY) if isinstance(data.get(VKEY), int) else 0
     return clean_lists(data), ver
+
+
+def write_names(out):
+    """Атомарная запись на диск (tmp в той же папке + os.replace) с .bak."""
+    if os.path.exists(NAMES_FILE):
+        shutil.copy2(NAMES_FILE, NAMES_FILE + ".bak")
+    fd, tmp = tempfile.mkstemp(dir=ROOT, suffix=".names.tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
+        os.replace(tmp, NAMES_FILE)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def save_names(clean, client_v):
+    """Атомарно: чтение версии → проверка client_v → запись. Возвращает
+    (new_v, None) при успехе или (None, (code, json_obj)) при конфликте/ошибке.
+    Защищено NAMES_LOCK, чтобы конкурентные POST не теряли обновления."""
+    with NAMES_LOCK:
+        try:
+            _, cur_v = read_names()
+        except Exception as e:
+            return None, (500, {"error": str(e)})
+        if isinstance(client_v, int) and client_v != cur_v:
+            return None, (409, {"error": "список имён изменён другим пользователем — обновите страницу (F5) и повторите",
+                                "conflict": True, VKEY: cur_v})
+        out = dict(clean)
+        out[VKEY] = cur_v + 1
+        try:
+            write_names(out)
+        except Exception as e:
+            return None, (500, {"error": "запись не удалась: %s" % e})
+        return cur_v + 1, None
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -149,29 +187,10 @@ class Handler(SimpleHTTPRequestHandler):
             clean = clean_lists(data)
         except Exception as e:
             return self._json(400, {"error": str(e)})
-        try:
-            _, cur_v = read_names()
-        except Exception as e:
-            return self._json(500, {"error": str(e)})
-        if isinstance(client_v, int) and client_v != cur_v:
-            return self._json(409, {"error": "список имён изменён другим пользователем — обновите страницу (F5) и повторите",
-                                    "conflict": True, VKEY: cur_v})
-        out = dict(clean)
-        out[VKEY] = cur_v + 1
-        try:
-            if os.path.exists(NAMES_FILE):
-                shutil.copy2(NAMES_FILE, NAMES_FILE + ".bak")
-            fd, tmp = tempfile.mkstemp(dir=ROOT, suffix=".names.tmp")
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    f.write(json.dumps(out, ensure_ascii=False, indent=2) + "\n")
-                os.replace(tmp, NAMES_FILE)
-            finally:
-                if os.path.exists(tmp):
-                    os.unlink(tmp)
-        except Exception as e:
-            return self._json(500, {"error": "запись не удалась: %s" % e})
-        self._json(200, {"ok": True, VKEY: cur_v + 1})
+        new_v, err = save_names(clean, client_v)
+        if err:
+            return self._json(*err)
+        self._json(200, {"ok": True, VKEY: new_v})
 
 
 def lan_ip():
@@ -187,6 +206,10 @@ def lan_ip():
 
 
 if __name__ == "__main__":
+    argv = sys.argv[1:]
+    open_browser = "--open" in argv
+    argv = [a for a in argv if a != "--open"]
+    port = int(argv[0]) if argv else 8765   # CLI-аргументы не видны при импорте (тесты)
     try:
         sys.stdout.reconfigure(errors="replace")   # консоль Windows может не любить кириллицу
     except Exception:
@@ -194,18 +217,18 @@ if __name__ == "__main__":
     os.chdir(ROOT)
     handler = lambda *a, **kw: Handler(*a, directory=ROOT, **kw)  # noqa: E731
     try:
-        httpd = ThreadingHTTPServer(("", PORT), handler)
+        httpd = ThreadingHTTPServer(("", port), handler)
     except OSError as e:
-        print("Не удалось запустить сервер на порту %d: %s" % (PORT, e), flush=True)
+        print("Не удалось запустить сервер на порту %d: %s" % (port, e), flush=True)
         print("Скорее всего порт занят — закройте другое окно Сюжет-Студии или поменяйте порт.")
         sys.exit(1)
     print("Сюжет-Студия запущена (Ctrl+C или закрытие окна — остановка)", flush=True)
-    print("  На этом компьютере:  http://localhost:%d" % PORT, flush=True)
+    print("  На этом компьютере:  http://localhost:%d" % port, flush=True)
     ip = lan_ip()
     if ip:
-        print("  В сети для коллег:    http://%s:%d" % (ip, PORT), flush=True)
-    if OPEN_BROWSER:
-        webbrowser.open("http://localhost:%d" % PORT)
+        print("  В сети для коллег:    http://%s:%d" % (ip, port), flush=True)
+    if open_browser:
+        webbrowser.open("http://localhost:%d" % port)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

@@ -1,0 +1,28 @@
+name: Release
+
+# Собирает готовый .zip и прикрепляет его к GitHub Release при пуше тега v*.
+# Артефакт создаёт scripts/make_release_zip.py (без make-win.sh, кросс-платформенно).
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Собрать дистрибутив
+        run: python scripts/make_release_zip.py
+      - name: Публикация релиза
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/syuzhet-studio-*.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
