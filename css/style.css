@@ -14,6 +14,13 @@
     --ok: #78d64b; --warn: #ff9a3c; --err: #ff4b3e;
     --sel: #2d4c6b; --hover: rgba(255,255,255,.06);
     --mark: #5a3d1c; --mark-h: #6e4a22;
+    /* семантические подложки (тёмная тема; светлая переопределяют ниже) */
+    --info-bg: #22384a; --info-text: #9fc6ea;
+    --ok-bg: #2c4527;
+    --warn-bg: #55401f; --warn-line: #6b5426;
+    --err-bg: #4f2523; --err-hover: #5c2a26; --err-line: #7a3a34;
+    --line-soft: rgba(255,255,255,.07);
+    --popup-shadow: 0 10px 26px rgba(0,0,0,.5);
     /* clip colors блоков (приглушены под графит) */
     --k-headline: #2f7ccf; --k-vod: #44945f; --k-vo: #c3a64d;
     --k-sync: #df584f; --k-standup: #9471df; --k-life: #df8e20; --k-spiegel: #9a5d43;
@@ -606,7 +613,7 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     border-color: var(--err);
     background: repeating-linear-gradient(-45deg, var(--input-bg) 0 9px, #241c1a 9px 18px);
 }
-.doc-part.offline .file { color: #e0a0a0; }
+.doc-part.offline .file { color: var(--err); }
 
 /* ---- скраббер (лента перемотки Premiere) ---- */
 .scrubber { position: relative; height: 14px; margin: 0; cursor: crosshair; touch-action: none; user-select: none; background: #161616; }
@@ -704,9 +711,9 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     color: var(--text-strong); font-size: 12px; padding: 1px 10px; vertical-align: middle;
 }
 #toast .toast-act:hover { background: var(--ctl-h); }
-#toast.ok { background: #2c4527; }
-#toast.warn { background: #55401f; }
-#toast.err { background: #4f2523; }
+#toast.ok { background: var(--ok-bg); }
+#toast.warn { background: var(--warn-bg); }
+#toast.err { background: var(--err-bg); }
 
 .modal {
     position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 90;
@@ -731,8 +738,8 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .nm-row { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
 .nm-row input { flex: 1; min-width: 0; }
 .nm-badge { flex: 0 0 auto; font-size: 11px; padding: 2px 8px; border-radius: 8px; }
-.nm-badge.sh { background: #22384a; color: #9fc6ea; }
-.nm-badge.loc { background: #45402a; color: #d8cfa0; }
+.nm-badge.sh { background: var(--info-bg); color: var(--info-text); }
+.nm-badge.loc { background: var(--warn-bg); color: var(--warn); }
 .nm-row button { padding: 2px 9px; }
 .nm-row button[data-nm="del"]:hover { background: #4f2a26; }
 
@@ -746,9 +753,9 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .wm-row-head { display: flex; align-items: center; gap: 10px; }
 .wm-title { font-weight: 600; }
 .wm-tag { font-size: 11px; color: var(--text2); background: var(--input-bg); border: 1px solid var(--line); border-radius: 8px; padding: 1px 8px; }
-.wm-row.ch .wm-tag { color: #e8c48a; background: #4a3a1c; border-color: #6b5426; }
-.wm-row.miss .wm-tag { color: #e0a0a0; background: #4a2424; border-color: #6b3535; }
-.wm-del { display: flex; gap: 5px; align-items: center; margin: 0; color: #e0a0a0; font-size: 12px; }
+.wm-row.ch .wm-tag { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line); }
+.wm-row.miss .wm-tag { color: var(--err); background: var(--err-bg); border-color: var(--err-line); }
+.wm-del { display: flex; gap: 5px; align-items: center; margin: 0; color: var(--err); font-size: 12px; }
 .wm-del input { width: auto; }
 .wm-diff { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
 .wm-diff h4 { margin: 0 0 4px; font-size: 11px; color: var(--text3); font-weight: 600; text-transform: uppercase; }
@@ -774,19 +781,19 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 /* ============================ ДОБАВЛЕНО: баннер квоты ============================ */
 .quota-banner {
     position: sticky; top: 0; z-index: 8;
-    background: #3f2320; color: #f2c8c2; padding: 7px 14px; font-size: 13px;
-    display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #5e302b;
+    background: var(--err-bg); color: var(--err); padding: 7px 14px; font-size: 13px;
+    display: flex; gap: 10px; align-items: center; border-bottom: 1px solid var(--err-line);
 }
-.quota-banner button { background: #55302b; border: 1px solid #6e3a34; color: var(--text-strong); font-size: 12px; }
-.quota-banner button:hover { background: #6e3a34; }
+.quota-banner button { background: var(--err-hover); border: 1px solid var(--err-line); color: var(--text-strong); font-size: 12px; }
+.quota-banner button:hover { background: var(--err-line); }
 
 /* ============================ ДОБАВЛЕНО: ask-модалка ============================ */
 .ask-box { width: min(420px, 92vw); }
 .ask-box #askInput { margin: 6px 0 0; }
 .ask-box #askMsg { margin: 8px 0 0; }
 .ask-row { margin-top: 12px; }
-button.danger { background: #5c2a26; border-color: #7a3a34; }
-button.danger:hover { background: #7a3a34; }
+button.danger { background: var(--err-hover); border-color: var(--err-line); }
+button.danger:hover { background: var(--err-line); }
 
 /* ============================ ДОБАВЛЕНО: якоря комментариев ============================ */
 .cl-filter { font-size: 11px; color: var(--text2); padding: 2px 0 6px; }
@@ -865,12 +872,6 @@ html[data-theme="light"] .proj-menu,
 html[data-theme="light"] .emoji-pop,
 html[data-theme="light"] .modal-box { box-shadow: var(--popup-shadow); }
 html[data-theme="light"] .modal { background: rgba(24,39,60,.38); }
-html[data-theme="light"] .nm-badge.sh { background: var(--info-bg); color: var(--info-text); }
-html[data-theme="light"] .nm-badge.loc { background: var(--warn-bg); color: var(--warn); }
-html[data-theme="light"] .wm-row.ch .wm-tag { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-line); }
-html[data-theme="light"] .wm-row.miss .wm-tag { background: var(--err-bg); color: var(--err); border-color: var(--err-line); }
-html[data-theme="light"] .wm-del,
-html[data-theme="light"] .doc-part.offline .file { color: var(--err); }
 html[data-theme="light"] .doc-part.offline {
     background: repeating-linear-gradient(-45deg, var(--input-bg) 0 9px, var(--err-bg) 9px 18px);
 }
@@ -879,7 +880,6 @@ html[data-theme="light"] button.danger,
 html[data-theme="light"] .quota-banner button { background: var(--err-bg); border-color: var(--err-line); color: var(--err); }
 html[data-theme="light"] button.danger:hover,
 html[data-theme="light"] .quota-banner button:hover { background: var(--err-hover); }
-html[data-theme="light"] .quota-banner { background: var(--err-bg); color: var(--err); border-bottom-color: var(--err-line); }
 html[data-theme="light"] #toast { box-shadow: var(--popup-shadow); }
 html[data-theme="light"] #toast.ok { background: var(--ok-bg); color: var(--ok); }
 html[data-theme="light"] #toast.warn { background: var(--warn-bg); color: var(--warn); }
