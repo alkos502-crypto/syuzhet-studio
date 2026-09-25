@@ -1058,34 +1058,6 @@ function updateMarks() {
     updateMarksText();
 }
 
-/* ---------- аудио-поиск для точной подгонки In/Out ----------
-   1) Q — «услышать позицию»: звук ~0.45 s от текущего кадра;
-   2) 🔊 на мониторе — звук при пошаговой подгонке (блип после каждого шага).
-   Потому что HTML5 seek не даёт чистый scrub, используем короткие «пробы» звука. */
-const MV_BLIP = 300, MV_PROBE = 450;
-let mvAudioOn = false;
-let mvProbeT = null;
-function mvAudioProbe(ms) {
-    const p = $("player");
-    if (!curFile || p.error) return;
-    if (p.paused && Number.isFinite(p.currentTime)) {
-        p.play().catch(() => {});
-        clearTimeout(mvProbeT);
-        mvProbeT = setTimeout(() => { try { p.pause(); } catch (e) {} }, ms);
-    }
-}
-function mvStep(delta) {
-    stepPlayer(delta);
-    if (mvAudioOn) mvAudioProbe(MV_BLIP);
-}
-function mvToggleAudio() {
-    mvAudioOn = !mvAudioOn;
-    const b = $("btnAudioScrub");
-    if (b) { b.classList.toggle("on", mvAudioOn); b.setAttribute("aria-pressed", String(mvAudioOn)); }
-    toast(mvAudioOn ? "Звук при шаге: вкл — Q — услышать позицию" : "Звук при шаге: выкл", mvAudioOn ? "ok" : "");
-}
-(() => { const b = $("btnAudioScrub"); if (b) b.onclick = mvToggleAudio; })();
-
 /* ---------- блоки сценария ---------- */
 /* Реестр пиктограмм: stroke 2px, currentColor, viewBox 24 — единый язык с иконками транспорта.
    Ключи видов совпадают с kind-ключами — b.kind попадает в icon() напрямую. */
@@ -1938,15 +1910,14 @@ document.addEventListener("keydown", e => {
     else if (e.key === "o" || e.key === "O" || e.key === "щ" || e.key === "Щ") {
         e.shiftKey ? $("btnGoOut").click() : $("btnSetOut").click();
     }
-    else if (e.key === "ArrowLeft") { e.preventDefault(); mvStep(e.shiftKey ? -1 : -frame()); }
-    else if (e.key === "ArrowRight") { e.preventDefault(); mvStep(e.shiftKey ? 1 : frame()); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); stepPlayer(e.shiftKey ? -1 : -frame()); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); stepPlayer(e.shiftKey ? 1 : frame()); }
     else if (e.key === " ") { e.preventDefault(); p.paused ? p.play() : p.pause(); }
     else if (e.key === "p" || e.key === "P" || e.key === "з" || e.key === "З") { e.preventDefault(); togglePreview(); }
-    else if (e.key === "q" || e.key === "Q" || e.key === "й" || e.key === "Й") { e.preventDefault(); if (curFile) mvAudioProbe(MV_PROBE); }
     /* J / K / L — шаг назад, пауза, шаг вперёд (физические клавиши, работает и в русской раскладке) */
-    else if (e.key === "j" || e.key === "J" || e.key === "о" || e.key === "О") { e.preventDefault(); mvStep(-1); }
+    else if (e.key === "j" || e.key === "J" || e.key === "о" || e.key === "О") { e.preventDefault(); stepPlayer(-1); }
     else if (e.key === "k" || e.key === "K" || e.key === "л" || e.key === "Л") { e.preventDefault(); $("btnPlay").click(); }
-    else if (e.key === "l" || e.key === "L" || e.key === "д" || e.key === "Д") { e.preventDefault(); mvStep(1); }
+    else if (e.key === "l" || e.key === "L" || e.key === "д" || e.key === "Д") { e.preventDefault(); stepPlayer(1); }
 });
 
 /* ---------- поиск по сюжету (Ctrl+F) ---------- */
