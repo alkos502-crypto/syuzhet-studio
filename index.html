@@ -190,15 +190,35 @@
     <div class="mview" id="mv-media" role="tabpanel">
         <!-- МОНИТОР (Source Monitor): плеер + метки In/Out + транспорт -->
         <section class="panel-sec" data-panel="monitor">
-            <div class="panel-head">
-                <span class="ph-title">Monitor</span>
-                <span id="monFile" class="ph-file" title=""></span>
-                <span class="spacer"></span>
-                <button class="ph-fold" aria-expanded="true" title="Свернуть/развернуть панель">▾</button>
-            </div>
-            <div class="panel-body pbb-flush">
-                <div class="monitor">
+<div class="panel-head">
+            <span class="ph-title">Monitor</span>
+            <span id="monFile" class="ph-file" title=""></span>
+            <span class="spacer"></span>
+            <select id="zoomSel" class="mv-zoom" title="Масштаб кадра (как в Source Monitor Premiere)">
+                <option value="fit">Fit</option>
+                <option value="50">50%</option>
+                <option value="100">100%</option>
+                <option value="200">200%</option>
+            </select>
+            <button id="btnTgTc" class="ib mv-tgl" title="Таймкод поверх кадра" aria-pressed="false">TC</button>
+            <button id="btnTgSafe" class="ib mv-tgl" title="Безопасные поля (Action 90% / Title 80%)" aria-pressed="false">◎</button>
+            <button class="ph-fold" aria-expanded="true" title="Свернуть/развернуть панель">▾</button>
+        </div>
+        <div class="panel-body pbb-flush">
+            <div class="monitor">
+                <div class="mstage" id="mStage">
                     <video id="player" preload="metadata"></video>
+                    <div id="mOverlay" class="moverlay">
+                        <div id="mvRange" class="mv-range" hidden></div>
+                        <div id="mvIn" class="mv-bracket in" data-lbl="In" hidden></div>
+                        <div id="mvOut" class="mv-bracket out" data-lbl="Out" hidden></div>
+                        <div id="mvSafe" class="mv-safe" hidden>
+                            <div class="mv-safe-outer">Action</div>
+                            <div class="mv-safe-inner">Title</div>
+                        </div>
+                        <div id="mvTc" class="mv-tc" hidden>00:00:00:00</div>
+                    </div>
+                </div>
 
                     <div id="scrubber" class="scrubber" title="Клик/перетаскивание — перемотка; края зоны — перетаскивание входа/выхода">
                         <div class="scrub-track"></div>

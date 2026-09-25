@@ -959,6 +959,7 @@ function updateScrub() {
         $("scrubPlay").style.left = secToPct(p.currentTime) + "%";
         $("curTc").textContent = tc(p.currentTime);
     }
+    updateMvTc();
     requestAnimationFrame(scrubLoop);
 })();
 
@@ -1056,7 +1057,87 @@ function updateMarksText() {
 function updateMarks() {
     updateScrub();
     updateMarksText();
+    updateMvOverlay();
 }
+
+/* ---------- монитор: таймкод, безопасные поля, масштаб (стиль Source Monitor) ---------- */
+let mvTcOn = false, mvSafeOn = false;
+const mvPan = { x: 0, y: 0, down: null };
+function mvZoom() { const s = $("zoomSel"); return s ? s.value : "fit"; }
+function updateMvTc() {
+    const el = $("mvTc"), p = $("player");
+    if (el && !el.hidden && Number.isFinite(p.currentTime)) el.textContent = tc(p.currentTime);
+}
+function updateMvOverlay() {
+    const d = $("player").duration || 0;
+    const zoomed = mvZoom() !== "fit";
+    const inB = $("mvIn"), outB = $("mvOut"), rng = $("mvRange");
+    const show = !zoomed && d > 0 && Number.isFinite(markIn) && Number.isFinite(markOut) && markOut > markIn;
+    if (inB) inB.hidden = !show;
+    if (outB) outB.hidden = !show;
+    if (rng) rng.hidden = !show;
+    if (show) {
+        const li = Math.max(0, (markIn / d) * 100);
+        const lo = Math.min(100, (markOut / d) * 100);
+        inB.style.left = li + "%";
+        outB.style.left = lo + "%";
+        rng.style.left = li + "%";
+        rng.style.width = Math.max(0, lo - li) + "%";
+    }
+}
+function refreshMvVis() {
+    const zoomed = mvZoom() !== "fit";
+    const tcE = $("mvTc"), sf = $("mvSafe");
+    if (tcE) tcE.hidden = zoomed || !mvTcOn;
+    if (sf) sf.hidden = zoomed || !mvSafeOn;
+    updateMvOverlay();
+}
+function toggleMvTc() {
+    mvTcOn = !mvTcOn;
+    const b = $("btnTgTc");
+    if (b) { b.classList.toggle("on", mvTcOn); b.setAttribute("aria-pressed", String(mvTcOn)); updateMvTc(); }
+    refreshMvVis();
+}
+function toggleMvSafe() {
+    mvSafeOn = !mvSafeOn;
+    const b = $("btnTgSafe");
+    if (b) { b.classList.toggle("on", mvSafeOn); b.setAttribute("aria-pressed", String(mvSafeOn)); }
+    refreshMvVis();
+}
+function mvRenderTransform() {
+    const v = $("player"); if (!v) return;
+    const z = mvZoom();
+    if (z === "fit") { v.style.transform = ""; return; }
+    const s = (+z) / 100;
+    v.style.transformOrigin = "center";
+    v.style.transform = "translate(" + mvPan.x + "px," + mvPan.y + "px) scale(" + s + ")";
+}
+function mvResetPan() { mvPan.x = 0; mvPan.y = 0; mvRenderTransform(); }
+function applyMvZoom() { refreshMvVis(); mvResetPan(); }
+(function bindMv() {
+    const zs = $("zoomSel"), tc = $("btnTgTc"), sf = $("btnTgSafe"), ms = $("mStage");
+    if (zs) zs.addEventListener("change", applyMvZoom);
+    if (tc) tc.onclick = toggleMvTc;
+    if (sf) sf.onclick = toggleMvSafe;
+    if (ms) {
+        ms.addEventListener("pointerdown", e => {
+            if (mvZoom() === "fit") return;
+            ms.setPointerCapture(e.pointerId);
+            mvPan.down = { x: e.clientX, y: e.clientY, px: mvPan.x, py: mvPan.y };
+        });
+        ms.addEventListener("pointermove", e => {
+            if (!mvPan.down || mvZoom() === "fit") return;
+            const s = (+mvZoom()) / 100;
+            const mx = (s - 1) * ms.clientWidth / 2, my = (s - 1) * ms.clientHeight / 2;
+            mvPan.x = Math.max(-mx, Math.min(mx, mvPan.down.px + (e.clientX - mvPan.down.x)));
+            mvPan.y = Math.max(-my, Math.min(my, mvPan.down.py + (e.clientY - mvPan.down.y)));
+            mvRenderTransform();
+        });
+        ms.addEventListener("pointerup", () => { mvPan.down = null; });
+        ms.addEventListener("pointercancel", () => { mvPan.down = null; });
+    }
+    applyMvZoom();
+})();
 
 /* ---------- блоки сценария ---------- */
 /* Реестр пиктограмм: stroke 2px, currentColor, viewBox 24 — единый язык с иконками транспорта.
