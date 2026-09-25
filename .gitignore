@@ -4,3 +4,7 @@ __pycache__/
 names.json.bak
 mediacentr-session.json
 mediacentr-session.txt
+# локальный лаунчер и артефакты сборки (генерируются make_release_zip)
+Запустить сервер.bat
+dist/
+.pytest_cache/

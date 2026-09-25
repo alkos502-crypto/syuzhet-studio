@@ -363,9 +363,26 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
 .proj-menu button:hover { background: var(--hover); color: var(--text-strong); border-color: transparent; }
 .proj-menu .pj-sep { height: 1px; background: var(--line); margin: 3px 2px; }
 .proj-menu.st-menu { width: 280px; max-height: 60vh; overflow-y: auto; }
-.st-menu button { display: flex; align-items: baseline; gap: 8px; }
-.st-menu .st-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.st-menu .st-mod { flex: 0 0 auto; font: 11px var(--mono); color: var(--text3); }
+.st-menu button { display: flex; flex-direction: column; align-items: stretch; gap: 1px; }
+.st-line { display: flex; align-items: center; gap: 8px; }
+.st-stage {
+    font: 700 9px sans-serif; letter-spacing: .06em; text-transform: uppercase;
+    padding: 1px 7px; border-radius: 8px; white-space: nowrap;
+}
+.st-stage.asg { color: var(--text3); background: var(--ctl); }
+.st-stage.wip { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--bg-2)); }
+.st-stage.rdy { color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, var(--bg-2)); }
+.st-stage.apr { color: var(--kt-standup); background: color-mix(in srgb, var(--k-standup) 26%, var(--bg-2)); }
+.st-stage.air { color: var(--err); background: color-mix(in srgb, var(--err) 18%, var(--bg-2)); }
+.st-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-mod { flex: 0 0 auto; font: 11px var(--mono); color: var(--text3); }
+.st-cnt, .st-task, .st-empty {
+    flex: 0 0 auto; font: 600 10px var(--mono); padding: 1px 6px; border-radius: 8px; white-space: nowrap;
+}
+.st-cnt { color: var(--text2); background: var(--ctl); }
+.st-task { color: var(--text2); background: var(--ctl); }
+.st-task.open { color: var(--accent-2); background: color-mix(in srgb, var(--accent-2) 16%, var(--bg-2)); }
+.st-empty { color: var(--text3); font-style: italic; background: transparent; }
 .st-menu button.cur { background: var(--sel); color: var(--text-strong); }
 .st-menu button.cur .st-mod { color: #cfe4f7; }
 .kind-item {
@@ -515,6 +532,19 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     border: 1px solid var(--line); border-radius: var(--r1); background: var(--input-bg);
     overflow-y: auto; margin: 0;
 }
+/* пустое состояние Media Browser — онбординг с CTA */
+.vl-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 9px;
+    padding: 30px 20px; text-align: center; color: var(--text2);
+}
+.vl-empty-ic {
+    width: 46px; height: 46px; stroke: var(--text3); fill: none;
+    stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round;
+}
+.vl-empty b { font: 600 13px sans-serif; color: var(--text); }
+.vl-empty span { font-size: 12px; max-width: 270px; line-height: 1.5; color: var(--text2); }
+.vl-empty i { font-style: normal; font-size: 11px; }
+.vl-empty button { padding: 6px 16px; margin-top: 2px; }
 .vl-list { height: 280px; }
 .vl-list .vl-item {
     position: relative; padding: 4px 18px 4px 10px; font-size: 12px; cursor: pointer; white-space: nowrap;

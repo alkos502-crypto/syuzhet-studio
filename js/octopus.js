@@ -299,18 +299,50 @@ async function newStoryDialog() {
 
 /* список сюжетов: меню «Проект» → «Сюжеты…» (переключение/дублирование/удаление) */
 function closeStoriesMenu() { const m = $("storiesMenu"); if (m) m.remove(); }
+/* сигналы сюжета для списка: этап-чип, счётчики заметок и открытых задач, «пусто» */
+const STAGE_SIG = {
+    "ASSIGNED":    { label: "назначен",   cls: "asg" },
+    "IN PROGRESS": { label: "в работе",   cls: "wip" },
+    "READY":       { label: "готов",      cls: "rdy" },
+    "APPROVED":    { label: "согласован", cls: "apr" },
+    "ON AIR":      { label: "в эфире",    cls: "air" }
+};
+function storySignals(s) {
+    const st = STAGE_SIG[s.stage];
+    const notes = (s.comments || []).filter(c => c.kind !== "task").length;
+    const tasks = (s.comments || []).filter(c => c.kind === "task");
+    const open = tasks.filter(t => !t.done).length;
+    const badges = [];
+    if (!(s.blocks || []).length) badges.push('<span class="st-empty">пусто</span>');
+    if (notes) badges.push('<span class="st-cnt" title="Заметки и предложения">💬 ' + notes + '</span>');
+    if (tasks.length) badges.push('<span class="st-task' + (open ? " open" : "") +
+        '" title="Задачи: открыто ' + open + ', закрыто ' + (tasks.length - open) + '">☐ ' +
+        open + '/' + tasks.length + '</span>');
+    return {
+        stage: st ? '<span class="st-stage st-' + st.cls + '">' + st.label + '</span>' : "",
+        badges: badges.join("")
+    };
+}
 function showStoriesMenu(anchor) {
     if ($("storiesMenu")) { closeStoriesMenu(); return; }
     closeProjMenu();
     ocFlushNow();
     const m = document.createElement("div");
     m.id = "storiesMenu"; m.className = "proj-menu st-menu";
-    m.innerHTML = OC.stories.map(s => `
-        <button data-st-id="${s.id}" class="${s.id === OC.activeId ? "cur" : ""}"
-            aria-current="${s.id === OC.activeId ? "true" : "false"}">
-            <span class="st-name">${s.id === OC.activeId ? "✓ " : ""}${esc(s.title || "Без названия")}</span>
-            <span class="st-mod">${esc(s.modified || "")}</span>
-        </button>`).join("") +
+    m.innerHTML = OC.stories.map(s => {
+        const sig = storySignals(s);
+        const isCur = s.id === OC.activeId;
+        return `<button data-st-id="${s.id}" class="${isCur ? "cur" : ""}"
+            aria-current="${isCur ? "true" : "false"}">
+            <span class="st-line">
+                ${sig.stage}
+                <span class="spacer"></span>
+                ${sig.badges}
+                <span class="st-mod">${esc(s.modified || "")}</span>
+            </span>
+            <span class="st-name">${isCur ? "✓ " : ""}${esc(s.title || "Без названия")}</span>
+        </button>`;
+    }).join("") +
         '<div class="pj-sep"></div><button data-st-menu="dup">⧉ Дублировать текущий</button>' +
         '<button data-st-menu="del">🗑 Удалить текущий</button>';
     document.body.appendChild(m);

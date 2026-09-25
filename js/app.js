@@ -777,7 +777,14 @@ function refreshVideoList() {
     const host = $("videoList");
     host.innerHTML = "";
     if (!videoFiles.length) {
-        host.innerHTML = '<div class="muted" style="padding:8px">Папка не выбрана или видео не найдено</div>';
+        host.innerHTML = `<div class="vl-empty">
+            <svg class="vl-empty-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v6M9.2 13.8 12 16.6l2.8-2.8"/></svg>
+            <b>Нет исходников</b>
+            <span>Выберите папку с видео (можно сетевую, включая подпапки) — в ней появятся файлы для разметки.</span>
+            <button id="btnEmptyPickFolder" type="button" class="accent">📁 Выбрать папку с исходниками</button>
+            <i class="muted">Выбранную папку можно перечитывать заново — ⟳ в заголовке «Media Browser».</i>
+        </div>`;
+        host.querySelector("#btnEmptyPickFolder").onclick = pickFolder;
     } else {
         /* фильтр по подстроке пути/имени (регистр не важен); videoFiles не мутируется */
         const q = $("videoSearch").value.trim().toLowerCase();
