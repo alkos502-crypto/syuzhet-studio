@@ -369,6 +369,7 @@ function renderHead() {
     $("ocStoryId").textContent = String(st.id).padStart(8, "0");
     $("ocModified").textContent = st.modified || "—";
     $("sbFps").textContent = $("fpsInput").value || "—";
+    if (typeof updateHeaderStatus === "function") updateHeaderStatus();
 }
 /* ---------- статус-бар: сохранение / FPS ---------- */
 function sbDirty() {
@@ -917,8 +918,21 @@ document.addEventListener("keydown", e => {
         e.preventDefault(); toggleKeys();
     }
 });
-["ocBell", "ocApps"].forEach(id =>
-    $(id).onclick = () => toast("Раздел в разработке", "warn"));
+/* шапка: живой индикатор задач + профиль = корреспондент активного сюжета */
+function updateHeaderStatus() {
+    let open = 0;
+    (OC.stories || []).forEach(s => (s.comments || []).forEach(c => {
+        if (c.kind === "task" && !c.done) open++;
+    }));
+    const badge = $("ocBellBadge");
+    if (badge) { badge.hidden = !open; badge.textContent = open > 99 ? "99+" : String(open); }
+    const name = (typeof resolveNameValue === "function" && resolveNameValue("fioReporter")) || "";
+    const pfName = $("pfName"), pfRole = $("pfRole");
+    if (pfName) pfName.textContent = name || "Гость";
+    if (pfRole) pfRole.textContent = name ? "Корреспондент" : "нет роли";
+}
+$("ocBell").onclick = () => { ocFlushNow(); showStoriesMenu($("ocBell")); };
+$("ocBell").title = "Задачи со всех сюжетов — клик откроет список";
 function openKeys() { $("keysModal").hidden = false; $("kmClose").focus(); }
 function closeKeys() { $("keysModal").hidden = true; }
 function toggleKeys() { $("keysModal").hidden ? openKeys() : closeKeys(); }
