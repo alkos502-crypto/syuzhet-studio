@@ -996,22 +996,33 @@ function dragHandle(which, e) {
     updateMarksText();
 }
 
-$("btnSetIn").addEventListener("click", () => {
+function mvSetIn() {
     if (!curFile) return toast("Сначала откройте видео (клик в списке)", "err");
     markIn = $("player").currentTime;
     marksSet = true;                       /* пользовательские метки — дефолт не перезапишет */
     if (markOut !== null && markOut <= markIn)
         markOut = Math.min($("player").duration, markIn + frame());  /* зона не пропадает */
     updateMarks();
-});
-$("btnSetOut").addEventListener("click", () => {
+}
+function mvSetOut() {
     if (!curFile) return toast("Сначала откройте видео", "err");
     if (markIn !== null && $("player").currentTime <= markIn)
         return toast("Out должен быть позже In", "err");
     markOut = $("player").currentTime;
     marksSet = true;
     updateMarks();
-});
+}
+/* скобки In/Out в транспорте: клик — поставить, повторный — сбросить (как play/pause) */
+(() => {
+    const mi = $("mrkIn"), mo = $("mrkOut");
+    if (mi) mi.onclick = () => { if (markIn !== null) { markIn = null; updateMarks(); } else mvSetIn(); };
+    if (mo) mo.onclick = () => { if (markOut !== null) { markOut = null; updateMarks(); } else mvSetOut(); };
+})();
+function updateBrackets() {
+    const mi = $("mrkIn"), mo = $("mrkOut");
+    if (mi) mi.classList.toggle("on", markIn !== null);
+    if (mo) mo.classList.toggle("on", markOut !== null);
+}
 $("btnClearMarks").onclick = () => {
     /* сброс к краям файла (а не в пустоту): зона всегда видна */
     const p = $("player");
@@ -1056,6 +1067,7 @@ function updateMarksText() {
 function updateMarks() {
     updateScrub();
     updateMarksText();
+    updateBrackets();
 }
 
 /* ---------- аудио-поиск для точной подгонки In/Out ----------
@@ -1933,10 +1945,10 @@ document.addEventListener("keydown", e => {
     if (inField) return;
     const p = $("player");
     if (e.key === "i" || e.key === "I" || e.key === "ш" || e.key === "Ш") {
-        e.shiftKey ? $("btnGoIn").click() : $("btnSetIn").click();
+        e.shiftKey ? $("btnGoIn").click() : mvSetIn();
     }
     else if (e.key === "o" || e.key === "O" || e.key === "щ" || e.key === "Щ") {
-        e.shiftKey ? $("btnGoOut").click() : $("btnSetOut").click();
+        e.shiftKey ? $("btnGoOut").click() : mvSetOut();
     }
     else if (e.key === "ArrowLeft") { e.preventDefault(); mvStep(e.shiftKey ? -1 : -frame()); }
     else if (e.key === "ArrowRight") { e.preventDefault(); mvStep(e.shiftKey ? 1 : frame()); }

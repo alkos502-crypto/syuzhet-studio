@@ -644,6 +644,14 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     padding: 5px 8px; background: var(--pr-bar); border-top: 1px solid #000;
 }
 .transport .tc { font: 600 12px var(--mono); color: var(--text-strong); padding: 0 6px; }
+.tc-marks { display: inline-flex; align-items: center; gap: 1px; margin: 0 2px; }
+.tc-br {
+    font: 700 14px/1 var(--mono); color: var(--text3); cursor: pointer;
+    padding: 1px 3px; border-radius: var(--r1); user-select: none;
+}
+.tc-br:hover { color: var(--text-strong); background: var(--pr-btn-h); }
+.tc-br.on { color: var(--pr-blue); }
+.tc-br.on:hover { color: #8ec5ff; }
 .transport .tc.muted { font-size: 11px; color: var(--text2); }
 .transport button {
     display: inline-flex; align-items: center; justify-content: center; gap: 4px;
