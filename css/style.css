@@ -509,36 +509,6 @@ label { display: block; margin: 6px 0 2px; color: var(--text2); font-size: 11px;
     width: 100%; aspect-ratio: 16 / 9; object-fit: contain;
     background: #000; border-radius: 0; display: block;
 }
-/* сцена/оверлеи — стиль Source Monitor Premiere (табы In/Out, ТК, safe, зум) */
-.mstage { position: relative; overflow: hidden; cursor: crosshair; }
-.moverlay { position: absolute; inset: 0; pointer-events: none; }
-.mv-bracket {
-    position: absolute; top: 0; bottom: 0; width: 2px;
-    background: var(--pr-blue); opacity: .9;
-}
-.mv-bracket::before {
-    content: attr(data-lbl); position: absolute; top: 5px; left: 1px; transform: translateX(-50%);
-    background: rgba(12,18,30,.78); color: #cfe9ff; font: 700 9px var(--mono);
-    padding: 1px 5px; border-radius: 3px; letter-spacing: .05em; white-space: nowrap;
-}
-.mv-range { position: absolute; top: 0; height: 3px; background: var(--pr-blue); opacity: .9; }
-.mv-safe { position: absolute; inset: 5%; border: 1px solid rgba(120,190,255,.6); }
-.mv-safe-outer {
-    position: absolute; inset: 0; border: 1px solid rgba(255,255,255,.35);
-    color: rgba(255,255,255,.5); font: 9px var(--mono); padding: 2px 4px;
-}
-.mv-safe-inner {
-    position: absolute; inset: 5%; border: 1px dashed rgba(255,232,150,.55);
-    color: rgba(255,232,150,.6); font: 9px var(--mono); padding: 2px 4px;
-}
-.mv-tc {
-    position: absolute; right: 6px; bottom: 6px;
-    background: rgba(12,18,30,.72); color: #c8ff59; font: 600 12px var(--mono);
-    padding: 2px 6px; border-radius: 3px; letter-spacing: .04em;
-}
-.mv-zoom { width: auto; min-width: 62px; font: 600 11px var(--mono); padding: 1px 4px; min-height: 22px; }
-.mv-tgl { font-size: 10px; font-weight: 700; letter-spacing: .04em; }
-.mv-tgl.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .view-toggle { display: inline-flex; gap: 1px; }
 .view-toggle button {
     padding: 3px 7px; border-radius: 0; display: inline-flex; align-items: center;
