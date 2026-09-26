@@ -91,6 +91,9 @@ let markIn = null, markOut = null; /* секунды */
 let marksSet = false;          /* метки заданы пользователем/фрагментом — дефолт не применять */
 let limitToMarks = false;      /* воспроизведение только фрагмента In→Out */
 let previewLoop = false;       /* P: циклический предпросмотр In→Out */
+/* двухуровневая навигация: окно масштаба детальной линейки ([s..e] доли клипа) */
+let zoomWin = { s: 0, e: 1 };
+const ZOOM_MIN = 0.05;
 
 const VIDEO_RE = /\.(mp4|mov|mxf|mts|m2ts|m2t|avi|mkv|mpg|mpeg|wmv)$/i;
 const DEFAULT_FPS = 25;     /* fps по умолчанию; поле «FPS» в шапке */
@@ -904,15 +907,19 @@ $("player").addEventListener("dblclick", () => $("btnPlay").click());
 function frame() { return 1 / fpsVal(); }
 function stepPlayer(sec) { const p = $("player"); p.currentTime = Math.max(0, Math.min(p.duration || 0, p.currentTime + sec)); }
 
-/* --- скраббер: перемотка + зона in→out + ручки --- */
+/* --- скраббер: перемотка + зона in→out + ручки + обзор с масштабом --- */
 const scrub = $("scrubber");
+function winRange() { const r = zoomWin.e - zoomWin.s; return r > 0 ? r : 1; }
+/* фракция позиции на детальной линейке -> секунды (с учётом окна масштаба) */
 function scrubFracToSec(frac) {
     const d = $("player").duration || 0;
-    return Math.max(0, Math.min(d, frac * d));
+    return Math.max(0, Math.min(d, d * (zoomWin.s + frac * winRange())));
 }
+/* секунды -> проценты на детальной линейке (относительно окна масштаба) */
 function secToPct(sec) {
     const d = $("player").duration;
-    return d ? (sec / d) * 100 : 0;
+    if (!d) return 0;
+    return ((sec / d - zoomWin.s) / winRange()) * 100;
 }
 function seekFromEvent(e) {
     const r = scrub.getBoundingClientRect();
@@ -926,24 +933,88 @@ function updateScrub() {
     const p = $("player"), d = p.duration;
     const play = $("scrubPlay");
     if (!d) { play.hidden = true; $("scrubSel").hidden = true;
-              $("scrubInH").hidden = true; $("scrubOutH").hidden = true; return; }
+              $("scrubInH").hidden = true; $("scrubOutH").hidden = true; updateOverview(); return; }
     play.hidden = false;
-    play.style.left = secToPct(p.currentTime) + "%";
+    play.style.left = Math.min(100, Math.max(0, secToPct(p.currentTime))) + "%";
     const sel = $("scrubSel"), hIn = $("scrubInH"), hOut = $("scrubOutH");
     if (markIn !== null && markOut !== null) {
         sel.hidden = false;
-        sel.style.left = secToPct(markIn) + "%";
-        sel.style.width = (secToPct(markOut) - secToPct(markIn)) + "%";
+        const li = Math.min(100, Math.max(0, secToPct(markIn)));
+        const lo = Math.min(100, Math.max(0, secToPct(markOut)));
+        sel.style.left = li + "%";
+        sel.style.width = Math.max(0, lo - li) + "%";
         hIn.hidden = hOut.hidden = false;
-        hIn.style.left = secToPct(markIn) + "%";
-        hOut.style.left = secToPct(markOut) + "%";
+        hIn.style.left = li + "%";
+        hOut.style.left = lo + "%";
     } else {
         sel.hidden = true; hIn.hidden = hOut.hidden = true;
     }
     /* переход в начало/конец фрагмента: активен, если соответствующий маркер задан */
     $("btnGoIn").disabled = markIn === null;
     $("btnGoOut").disabled = markOut === null;
+    updateOverview();
 }
+
+/* ---------- обзорная линейка + окно масштаба (как в Premiere) ---------- */
+function updateOverview() {
+    const d = $("player").duration || 0;
+    const ovS = $("ovSel"), w = $("ovWin");
+    if (!d) {
+        if (ovS) ovS.hidden = true;
+        if (w) w.hidden = true;
+        return;
+    }
+    if (ovS) {
+        const has = Number.isFinite(markIn) && Number.isFinite(markOut);
+        ovS.hidden = !has;
+        if (has) {
+            ovS.style.left = (markIn / d * 100) + "%";
+            ovS.style.width = Math.max(0, (markOut - markIn) / d * 100) + "%";
+        }
+    }
+    if (w) { w.hidden = false; w.style.left = zoomWin.s * 100 + "%"; w.style.width = winRange() * 100 + "%"; }
+}
+(function bindOverview() {
+    const ov = $("scrubOverview"), win = $("ovWin");
+    if (!ov || !win) return;
+    let mode = null, sx = 0, st = null;
+    const fracFromEvent = e => {
+        const r = ov.getBoundingClientRect();
+        return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    };
+    /* клик по обзору (мимо окна) — перемотать к этой позиции */
+    ov.addEventListener("pointerdown", e => {
+        if (e.target.closest("#ovWin")) return;
+        $("player").currentTime = $("player").duration * fracFromEvent(e);
+        updateScrub();
+    });
+    win.addEventListener("pointerdown", e => {
+        e.preventDefault(); e.stopPropagation();
+        win.setPointerCapture(e.pointerId);
+        mode = e.target.classList.contains("sw-l") ? "ls"
+             : e.target.classList.contains("sw-r") ? "re" : "pan";
+        st = { s: zoomWin.s, e: zoomWin.e };
+        sx = e.clientX;
+    });
+    win.addEventListener("pointermove", e => {
+        if (!mode) return;
+        const r = ov.getBoundingClientRect();
+        const dF = (e.clientX - sx) / r.width;
+        if (mode === "pan") {
+            const w = st.e - st.s;
+            let s = Math.max(0, Math.min(1 - w, st.s + dF));
+            zoomWin.s = s; zoomWin.e = s + w;
+        } else if (mode === "ls") {
+            zoomWin.s = Math.max(0, Math.min(st.e - ZOOM_MIN, st.s + dF));
+        } else { /* re */
+            zoomWin.e = Math.min(1, Math.max(st.s + ZOOM_MIN, st.e + dF));
+        }
+        updateScrub();
+    });
+    win.addEventListener("pointerup", () => { mode = null; });
+    win.addEventListener("pointercancel", () => { mode = null; });
+    ov.addEventListener("dblclick", () => { zoomWin = { s: 0, e: 1 }; updateScrub(); });
+})();
 /* rAF-цикл: плавный бегунок (timeupdate грубоват) + ограничитель фрагмента */
 (function scrubLoop() {
     const p = $("player");
