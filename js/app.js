@@ -2871,11 +2871,15 @@ function openTrxReview(b, text) {
 $("trxOk").onclick = () => {
     const b = trxTarget;
     if (!b) return;
+    const v = $("trxText").value;
     histBefore();
-    b.text = $("trxText").value;
+    /* при уже набранном тексте — дополняем, а не затираем (в блоке может быть 2-3 фрагмента) */
+    b.text = (b.text && b.text.trim())
+        ? (b.text.replace(/\s+$/, "") + " " + v.replace(/^\s+/, ""))
+        : v;
     $("trxModal").hidden = true; trxTarget = null;
     renderBlocks(); saveState();
-    toast("Текст вставлен в «" + blockTitle(b, typeNumbers()[b.id]) + "» (Ctrl+Z — вернуть)", "ok");
+    toast("Текст добавлен к «" + blockTitle(b, typeNumbers()[b.id]) + "» (Ctrl+Z — вернуть)", "ok");
 };
 $("trxCancel").onclick = () => { $("trxModal").hidden = true; trxTarget = null; };
 $("trxClose").onclick = () => { $("trxModal").hidden = true; trxTarget = null; };
