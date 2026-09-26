@@ -2779,28 +2779,29 @@ function wavFromBuffer(ab) {
     }
     return new Blob([dv], { type: "audio/wav" });
 }
-/* живая запись окна In–Out через <audio> + MediaRecorder: работает с любым
-   звуццом в плеере (в т.ч. HEVC/MXF), не декодирует весь файл, длина не важна. */
+/* живая запись окна In–Out через скрытый <video> + MediaRecorder:
+   гарантированно завершается (жёсткий таймаут = длительность фрагмента + буфер). */
 function captureAudioSlice(file, inSec, outSec) {
     return new Promise((resolve, reject) => {
         const url = URL.createObjectURL(file);
-        const a = document.createElement("audio");
-        a.preload = "auto";
+        const v = document.createElement("video");
+        v.preload = "auto"; v.muted = false;
         let started = false, rec = null, chunks = [], tmr = null, done = false;
         const finish = err => {
             if (done) return; done = true;
             if (tmr) clearInterval(tmr);
-            a.removeEventListener("pause", onPause);
+            v.removeEventListener("pause", onStop);
+            v.removeEventListener("ended", onStop);
             try { if (rec && rec.state !== "inactive") rec.stop(); } catch (_) {}
-            URL.revokeObjectURL(url); a.src = "";
-            if (err) reject(err); else resolve(new Blob(chunks, { type: (rec && rec.mimeType) || "audio/webm" }));
+            try { v.pause(); } catch (_) {}
+            URL.revokeObjectURL(url); v.removeAttribute("src"); v.load();
+            if (err) reject(err);
+            else resolve(new Blob(chunks, { type: (rec && rec.mimeType) || "audio/webm" }));
         };
-        const onPause = () => finish();
-        a.onerror = () => finish(new Error("не удалось воспроизвести аудио этого файла"));
-        a.src = url;
-        a.addEventListener("loadedmetadata", () => {
+        const onStop = () => finish();
+        const start = () => {
             if (started) return; started = true;
-            const stream = a.captureStream ? a.captureStream() : null;
+            const stream = v.captureStream ? v.captureStream() : null;
             if (!stream) return finish(new Error("браузер не поддерживает captureStream"));
             const audio = stream.getAudioTracks();
             if (!audio.length) return finish(new Error("в файле нет аудио-дорожки"));
@@ -2809,16 +2810,23 @@ function captureAudioSlice(file, inSec, outSec) {
             rec = new MediaRecorder(new MediaStream(audio), mime ? { mimeType: mime } : undefined);
             rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
             rec.onerror = e => finish(e.error || new Error("MediaRecorder error"));
-            a.addEventListener("pause", onPause);
-            a.currentTime = Math.max(0, inSec || 0);
+            v.addEventListener("pause", onStop);
+            v.addEventListener("ended", onStop);
+            try { v.currentTime = Math.max(0, inSec || 0); } catch (_) {}
             tmr = setInterval(() => {
-                const end = outSec || a.duration || 0;
-                if (end > 0 && a.currentTime >= end) finish();
-            }, 100);
+                const end = outSec || v.duration || 0;
+                if (end > 0 && v.currentTime >= end) finish();
+            }, 120);
+            /* жёсткий стоп: длительность фрагмента + буфер 8с — никогда не «повисаем» */
+            setTimeout(() => { if (!done) finish(v.duration ? null : new Error("воспроизведение не пошло")); },
+                (Math.max(1, (outSec || 1) - (inSec || 0)) + 8) * 1000);
             rec.start();
-            a.play().catch(e => finish(e));
-        });
-        setTimeout(() => { if (!started) finish(new Error("таймаут загрузки аудио файла")); }, 20000);
+            v.play().catch(e => finish(e));
+        };
+        v.onerror = () => finish(new Error("не удалось воспроизвести файл"));
+        v.onloadedmetadata = v.onloadeddata = () => { if (!started) { try { start(); } catch (e) { finish(e); } } };
+        v.src = url;
+        setTimeout(() => { if (!started) finish(new Error("таймаут загрузки файла")); }, 20000);
     });
 }
 /* вытащить аудио фрагмента. decodeAudioData может зависнуть на видео-контейнерах,
