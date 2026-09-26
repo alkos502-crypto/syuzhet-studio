@@ -2821,15 +2821,14 @@ function captureAudioSlice(file, inSec, outSec) {
         setTimeout(() => { if (!started) finish(new Error("таймаут загрузки аудио файла")); }, 20000);
     });
 }
-/* вытащить аудио фрагмента: быстрый путь (WebAudio decode), при неудаче — живая запись */
+/* вытащить аудио фрагмента. decodeAudioData может зависнуть на видео-контейнерах,
+   поэтому параллельно запускаем живую запись окна и берём, что придёт первым. */
 async function extractSliceBlob(file, inSec, outSec) {
-    try {
-        const wav = await extractWavSlice(file, inSec, outSec);
-        return { blob: wav, type: "audio/wav" };
-    } catch (e) {
-        const blob = await captureAudioSlice(file, inSec, outSec);
-        return { blob: blob, type: blob.type };
-    }
+    const decodeP = Promise.resolve().then(() => extractWavSlice(file, inSec, outSec))
+        .catch(() => new Promise(() => {}));     /* если decode упадёт — не ждём, берём запись */
+    const capP = captureAudioSlice(file, inSec, outSec);
+    const blob = await Promise.race([decodeP, capP]);
+    return { blob: blob, type: blob.type };
 }
 async function transcribePart(b, p) {
     if (!PART_KINDS.has(b.kind)) return;

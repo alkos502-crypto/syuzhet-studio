@@ -196,6 +196,7 @@ class Handler(SimpleHTTPRequestHandler):
     def _transcribe(self, body):
         """POST /transcribe: аудио-фрагмент (WAV/WebM/OGG) -> текст (офлайн, faster-whisper)."""
         ctype = (self.headers.get("Content-Type") or "").lower()
+        print("TRX ctype=%s len=%d" % (ctype, len(body)), file=sys.stderr, flush=True)
         if not ctype.startswith("audio/"):
             return self._json(415, {"error": "подайте аудио (audio/wav, audio/webm…)"})
         if not self.headers.get("X-Requested-With"):
@@ -203,6 +204,11 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             text = transcribe_wav(body)
         except Exception as e:
+            try:
+                import traceback
+                traceback.print_exc(file=sys.stderr)
+            except Exception:
+                pass
             return self._json(500, {"error": str(e)})
         return self._json(200, {"ok": True, "text": text})
 
