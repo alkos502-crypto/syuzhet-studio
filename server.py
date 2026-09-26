@@ -194,10 +194,10 @@ class Handler(SimpleHTTPRequestHandler):
         return (self.rfile.read(length) if length else b""), None
 
     def _transcribe(self, body):
-        """POST /transcribe: WAV-фрагмент -> текст (офлайн, faster-whisper)."""
+        """POST /transcribe: аудио-фрагмент (WAV/WebM/OGG) -> текст (офлайн, faster-whisper)."""
         ctype = (self.headers.get("Content-Type") or "").lower()
-        if "audio/wav" not in ctype:
-            return self._json(415, {"error": "подайте WAV (audio/wav)"})
+        if not ctype.startswith("audio/"):
+            return self._json(415, {"error": "подайте аудио (audio/wav, audio/webm…)"})
         if not self.headers.get("X-Requested-With"):
             return self._json(415, {"error": "запись только из интерфейса Сюжет-Студии"})
         try:

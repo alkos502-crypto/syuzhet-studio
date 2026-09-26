@@ -2779,6 +2779,58 @@ function wavFromBuffer(ab) {
     }
     return new Blob([dv], { type: "audio/wav" });
 }
+/* живая запись окна In–Out через <audio> + MediaRecorder: работает с любым
+   звуццом в плеере (в т.ч. HEVC/MXF), не декодирует весь файл, длина не важна. */
+function captureAudioSlice(file, inSec, outSec) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement("audio");
+        a.preload = "auto";
+        let started = false, rec = null, chunks = [], tmr = null, done = false;
+        const finish = err => {
+            if (done) return; done = true;
+            if (tmr) clearInterval(tmr);
+            a.removeEventListener("pause", onPause);
+            try { if (rec && rec.state !== "inactive") rec.stop(); } catch (_) {}
+            URL.revokeObjectURL(url); a.src = "";
+            if (err) reject(err); else resolve(new Blob(chunks, { type: (rec && rec.mimeType) || "audio/webm" }));
+        };
+        const onPause = () => finish();
+        a.onerror = () => finish(new Error("не удалось воспроизвести аудио этого файла"));
+        a.src = url;
+        a.addEventListener("loadedmetadata", () => {
+            if (started) return; started = true;
+            const stream = a.captureStream ? a.captureStream() : null;
+            if (!stream) return finish(new Error("браузер не поддерживает captureStream"));
+            const audio = stream.getAudioTracks();
+            if (!audio.length) return finish(new Error("в файле нет аудио-дорожки"));
+            const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"]
+                .find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
+            rec = new MediaRecorder(new MediaStream(audio), mime ? { mimeType: mime } : undefined);
+            rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+            rec.onerror = e => finish(e.error || new Error("MediaRecorder error"));
+            a.addEventListener("pause", onPause);
+            a.currentTime = Math.max(0, inSec || 0);
+            tmr = setInterval(() => {
+                const end = outSec || a.duration || 0;
+                if (end > 0 && a.currentTime >= end) finish();
+            }, 100);
+            rec.start();
+            a.play().catch(e => finish(e));
+        });
+        setTimeout(() => { if (!started) finish(new Error("таймаут загрузки аудио файла")); }, 20000);
+    });
+}
+/* вытащить аудио фрагмента: быстрый путь (WebAudio decode), при неудаче — живая запись */
+async function extractSliceBlob(file, inSec, outSec) {
+    try {
+        const wav = await extractWavSlice(file, inSec, outSec);
+        return { blob: wav, type: "audio/wav" };
+    } catch (e) {
+        const blob = await captureAudioSlice(file, inSec, outSec);
+        return { blob: blob, type: blob.type };
+    }
+}
 async function transcribePart(b, p) {
     if (!PART_KINDS.has(b.kind)) return;
     const vf = videoFiles.find(v => v.relPath === (p.path || p.file)) ||
@@ -2787,11 +2839,11 @@ async function transcribePart(b, p) {
     if (!(((p.out || 0) - (p.in || 0)) > 0.1)) return toast("Слишком короткий фрагмент", "warn");
     toast("Транскрибация фрагмента… (первая может занять время)", "warn");
     try {
-        const wav = await extractWavSlice(vf.file, p.in, p.out);
+        const { blob, type } = await extractSliceBlob(vf.file, p.in, p.out);
         const res = await fetch("transcribe", {
             method: "POST",
-            headers: { "Content-Type": "audio/wav", "X-Requested-With": "XMLHttpRequest" },
-            body: wav
+            headers: { "Content-Type": type, "X-Requested-With": "XMLHttpRequest" },
+            body: blob
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(j.error || ("HTTP " + res.status));
