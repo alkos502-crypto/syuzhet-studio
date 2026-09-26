@@ -2844,7 +2844,7 @@ async function transcribePart(b, p) {
                videoFiles.find(v => v.name === p.file);
     if (!vf || !vf.file) return toast("Файл не найден в папке исходников", "err");
     if (!(((p.out || 0) - (p.in || 0)) > 0.1)) return toast("Слишком короткий фрагмент", "warn");
-    toast("Транскрибация фрагмента… (первая может занять время)", "warn");
+    toast("Транскрибация фрагмента… (идёт запись и распознавание)", "warn", 20000);
     try {
         const { blob, type } = await extractSliceBlob(vf.file, p.in, p.out);
         const res = await fetch("transcribe", {
@@ -2857,7 +2857,8 @@ async function transcribePart(b, p) {
         if (!j.text) return toast("Текст не распознан (возможно, тишина)", "warn");
         openTrxReview(b, j.text);
     } catch (e) {
-        toast("Транскрибация не удалась: " + e.message, "err", 9000);
+        if (typeof console !== "undefined") { try { console.error("transcribe:", e); } catch (_) {} }
+        toast("Транскрибация не удалась: " + e.message, "err", 25000);
     }
 }
 function openTrxReview(b, text) {

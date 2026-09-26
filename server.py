@@ -109,7 +109,8 @@ def save_names(clean, client_v):
 # Устанавливается отдельно:  pip install faster-whisper
 # Модель (по умолчанию base) скачается при первом вызове — нужен интернет один раз.
 WHISPER_MODEL = os.environ.get("SS_WHISPER_MODEL", "base")
-_whisper = {"model": None, "name": None}
+WHISPER_DEVICE = os.environ.get("SS_WHISPER_DEVICE", "cpu")   # cpu — надёжно, без CUDA/cuBLAS
+_whisper = {"model": None, "name": None, "device": None}
 
 
 def transcribe_wav(data):
@@ -119,15 +120,23 @@ def transcribe_wav(data):
     except ImportError:
         raise RuntimeError("faster-whisper не установлен: выполните на сервере "
                            "'pip install faster-whisper' и перезапустите его")
-    if _whisper["model"] is None or _whisper["name"] != WHISPER_MODEL:
-        _whisper["model"] = WhisperModel(WHISPER_MODEL, device="auto", compute_type="int8")
+    if (_whisper["model"] is None or _whisper["name"] != WHISPER_MODEL
+            or _whisper["device"] != WHISPER_DEVICE):
+        _whisper["model"] = WhisperModel(WHISPER_MODEL, device=WHISPER_DEVICE, compute_type="int8")
         _whisper["name"] = WHISPER_MODEL
+        _whisper["device"] = WHISPER_DEVICE
     segments, _info = _whisper["model"].transcribe(BytesIO(data), language="ru", vad_filter=True)
     return " ".join(seg.text.strip() for seg in segments).strip()
 
 
 class Handler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"   # keep-alive; все ответы с Content-Length
+
+    def end_headers(self):
+        # no-store: браузер не должен кешировать устаревшие js/css/html —
+        # иначе после обновления кода юзер надолго «видит старьё»
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
 
     @staticmethod
     def _forbidden(path):
@@ -253,6 +262,15 @@ def lan_ip():
 
 
 if __name__ == "__main__":
+    # SS_LOG=<file> — писать весь вывод (запросы + ошибки) в файл, независимо от запуска
+    _logp = os.environ.get("SS_LOG")
+    if _logp:
+        try:
+            _lf = open(_logp, "a", encoding="utf-8", buffering=1)
+            sys.stdout = _lf
+            sys.stderr = _lf
+        except Exception:
+            pass
     argv = sys.argv[1:]
     open_browser = "--open" in argv
     argv = [a for a in argv if a != "--open"]
