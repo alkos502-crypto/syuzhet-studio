@@ -1053,16 +1053,18 @@ scrub.addEventListener("pointermove", e => {
 scrub.addEventListener("pointerup", () => { scrubDrag = null; updateMarks(); });
 scrub.addEventListener("pointercancel", () => { scrubDrag = null; });
 function dragHandle(which, e) {
+    const p = $("player");
+    const d = p.duration;
+    if (!(d > 0)) return;   /* длительность ещё неизвестна (NaN/0) — ручки не двигаем */
     const r = scrub.getBoundingClientRect();
     const sec = scrubFracToSec((e.clientX - r.left) / r.width);
-    const p = $("player");
     if (which === "in") {
-        markIn = Math.min(sec, (markOut ?? p.duration) - frame());
+        markIn = Math.min(sec, Math.max(0, (markOut ?? d) - frame()));
         markIn = Math.max(0, markIn);
         p.currentTime = markIn;
     } else {
         markOut = Math.max(sec, (markIn ?? 0) + frame());
-        markOut = Math.min(p.duration, markOut);
+        markOut = Math.min(d, markOut);
         p.currentTime = markOut;
     }
     marksSet = true;
