@@ -937,11 +937,12 @@ function updateScrub() {
         hIn.hidden = hOut.hidden = false;
         hIn.style.left = secToPct(markIn) + "%";
         hOut.style.left = secToPct(markOut) + "%";
-        $("btnGoIn").disabled = $("btnGoOut").disabled = false;
     } else {
         sel.hidden = true; hIn.hidden = hOut.hidden = true;
-        $("btnGoIn").disabled = $("btnGoOut").disabled = true;
     }
+    /* переход в начало/конец фрагмента: активен, если соответствующий маркер задан */
+    $("btnGoIn").disabled = markIn === null;
+    $("btnGoOut").disabled = markOut === null;
 }
 /* rAF-цикл: плавный бегунок (timeupdate грубоват) + ограничитель фрагмента */
 (function scrubLoop() {
@@ -1012,11 +1013,22 @@ function mvSetOut() {
     marksSet = true;
     updateMarks();
 }
-/* скобки In/Out в транспорте: клик — поставить, повторный — сбросить (как play/pause) */
+/* скобки In/Out в транспорте: клик ставит метку у текущего кадра;
+   повторный клик, стоя на этой же метке, — сбрасывает (как play/pause) */
 (() => {
     const mi = $("mrkIn"), mo = $("mrkOut");
-    if (mi) mi.onclick = () => { if (markIn !== null) { markIn = null; updateMarks(); } else mvSetIn(); };
-    if (mo) mo.onclick = () => { if (markOut !== null) { markOut = null; updateMarks(); } else mvSetOut(); };
+    if (mi) mi.onclick = () => {
+        if (!curFile) return toast("Сначала откройте видео (клик в списке)", "err");
+        const p = $("player");
+        const atCur = markIn !== null && p.duration > 0 && Math.abs(markIn - p.currentTime) < frame();
+        if (atCur) { markIn = null; updateMarks(); } else mvSetIn();
+    };
+    if (mo) mo.onclick = () => {
+        if (!curFile) return toast("Сначала откройте видео", "err");
+        const p = $("player");
+        const atCur = markOut !== null && p.duration > 0 && Math.abs(markOut - p.currentTime) < frame();
+        if (atCur) { markOut = null; updateMarks(); } else mvSetOut();
+    };
 })();
 function updateBrackets() {
     const mi = $("mrkIn"), mo = $("mrkOut");
