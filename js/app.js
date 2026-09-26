@@ -2766,11 +2766,3 @@ $("quotaDump").onclick = async () => {
     download("ss-storage-dump.json", JSON.stringify({ diag, stories, memory, persisted, local }, null, 1), "application/json");
     toast("Снимок выгружен: текущая работа, IDB, резерв и recovery-копии", "ok", 5000);
 };
-
-/* временная диагностика: показывать непойманные JS-ошибки тостом (для отладки) */
-window.addEventListener("error", e => {
-    if (typeof toast === "function") {
-        try { toast("Ошибка: " + (e.message || (e.error && e.error.message) || String(e)), "err", 9000); } catch (_) {}
-        try { console.error(e.error || e); } catch (_) {}
-    }
-});
