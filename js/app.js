@@ -2760,8 +2760,8 @@ function wavFromBuffer(ab) {
     const dv = new DataView(new ArrayBuffer(44 + n * 2));
     dv.setUint32(0, 0x46464952, true);
     dv.setUint32(4, 36 + n * 2, true);
-    dv.setUint32(8, 0x57415645, true);
-    dv.setUint32(12, 0x206d7466, true);
+    dv.setUint32(8, 0x45564157, true);
+    dv.setUint32(12, 0x20746d66, true);
     dv.setUint32(16, 16, true);
     dv.setUint16(20, 1, true);
     dv.setUint16(22, 1, true);
