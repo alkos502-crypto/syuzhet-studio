@@ -985,7 +985,9 @@ function updateOverview() {
     /* клик по обзору (мимо окна) — перемотать к этой позиции */
     ov.addEventListener("pointerdown", e => {
         if (e.target.closest("#ovWin")) return;
-        $("player").currentTime = $("player").duration * fracFromEvent(e);
+        const d = $("player").duration;
+        if (!(d > 0)) return;   /* метаданные ещё не пришли (duration NaN/0) — не искать */
+        $("player").currentTime = d * fracFromEvent(e);
         updateScrub();
     });
     win.addEventListener("pointerdown", e => {
