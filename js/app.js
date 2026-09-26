@@ -1822,9 +1822,11 @@ function renderBlocks() {
                 <span class="tc">${tc(p.in)} → ${tc(p.out)}</span>
                 <span class="tc">${durHuman(p.out - p.in)}</span>
                 <button data-act="goto" title="Открыть в плеере" aria-label="Открыть фрагмент в плеере">▶</button>
+                <button data-act="trx" title="Транскрибировать фрагмент (офлайн)" aria-label="Транскрибировать фрагмент">🎙</button>
                 <button data-act="del-part" title="Убрать фрагмент" aria-label="Убрать фрагмент">${icon("x",11)}</button>
             `;
             pe.querySelector("[data-act=del-part]").onclick = () => { histBefore(); b.parts.splice(pi, 1); renderBlocks(); saveState(); };
+            pe.querySelector("[data-act=trx]").onclick = () => transcribePart(b, p);
             pe.querySelector("[data-act=goto]").onclick = () => {
                 const path = p.path || p.file;
                 let vf = videoFiles.find(v => v.relPath === path);
@@ -2728,6 +2730,100 @@ $("wmClose").onclick = closeWordReview;
 $("wmOnlyChanged").onchange = renderWordReview;
 $("wordModal").addEventListener("mousedown", e => { if (e.target === $("wordModal")) closeWordReview(); });
 $("wordModal").addEventListener("keydown", e => trapTab(e.currentTarget.querySelector(".modal-box"), e));
+
+/* ---------- транскрибация фрагмента (офлайн: fast-whisper на сервере) ---------- */
+let trxTarget = null;
+/* вырезать аудио In–Out из файла в WAV (16 кГц моно) */
+async function extractWavSlice(file, inSec, outSec) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) throw new Error("браузер не поддерживает AudioContext");
+    const ctx = new Ctx();
+    try {
+        const buf = await ctx.decodeAudioData(await file.arrayBuffer());
+        const sr = 16000;
+        const start = Math.max(0, Math.min(buf.duration, inSec || 0));
+        const end = Math.max(start, Math.min(buf.duration, outSec || buf.duration));
+        const len = Math.max(1, Math.round((end - start) * sr));
+        const oac = new OfflineAudioContext(1, len, sr);
+        const src = oac.createBufferSource();
+        src.buffer = buf;
+        src.connect(oac.destination);
+        src.start(0, start, end - start);
+        const rendered = await oac.startRendering();
+        return wavFromBuffer(rendered);
+    } finally {
+        if (typeof ctx.close === "function") ctx.close();
+    }
+}
+function wavFromBuffer(ab) {
+    const ch = ab.getChannelData(0), n = ch.length;
+    const dv = new DataView(new ArrayBuffer(44 + n * 2));
+    dv.setUint32(0, 0x46464952, true);
+    dv.setUint32(4, 36 + n * 2, true);
+    dv.setUint32(8, 0x57415645, true);
+    dv.setUint32(12, 0x206d7466, true);
+    dv.setUint32(16, 16, true);
+    dv.setUint16(20, 1, true);
+    dv.setUint16(22, 1, true);
+    dv.setUint32(24, 16000, true);
+    dv.setUint32(28, 16000 * 2, true);
+    dv.setUint16(32, 2, true);
+    dv.setUint16(34, 16, true);
+    dv.setUint32(36, 0x61746164, true);
+    dv.setUint32(40, n * 2, true);
+    let o = 44;
+    for (let i = 0; i < n; i++) {
+        const s = Math.max(-1, Math.min(1, ch[i]));
+        dv.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        o += 2;
+    }
+    return new Blob([dv], { type: "audio/wav" });
+}
+async function transcribePart(b, p) {
+    if (!PART_KINDS.has(b.kind)) return;
+    const vf = videoFiles.find(v => v.relPath === (p.path || p.file)) ||
+               videoFiles.find(v => v.name === p.file);
+    if (!vf || !vf.file) return toast("Файл не найден в папке исходников", "err");
+    if (!(((p.out || 0) - (p.in || 0)) > 0.1)) return toast("Слишком короткий фрагмент", "warn");
+    toast("Транскрибация фрагмента… (первая может занять время)", "warn");
+    try {
+        const wav = await extractWavSlice(vf.file, p.in, p.out);
+        const res = await fetch("transcribe", {
+            method: "POST",
+            headers: { "Content-Type": "audio/wav", "X-Requested-With": "XMLHttpRequest" },
+            body: wav
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error || ("HTTP " + res.status));
+        if (!j.text) return toast("Текст не распознан (возможно, тишина)", "warn");
+        openTrxReview(b, j.text);
+    } catch (e) {
+        toast("Транскрибация не удалась: " + e.message, "err", 9000);
+    }
+}
+function openTrxReview(b, text) {
+    trxTarget = b;
+    $("trxText").value = text;
+    $("trxModal").hidden = false;
+    $("trxText").focus();
+    $("trxText").select();
+}
+$("trxOk").onclick = () => {
+    const b = trxTarget;
+    if (!b) return;
+    histBefore();
+    b.text = $("trxText").value;
+    $("trxModal").hidden = true; trxTarget = null;
+    renderBlocks(); saveState();
+    toast("Текст вставлен в «" + blockTitle(b, typeNumbers()[b.id]) + "» (Ctrl+Z — вернуть)", "ok");
+};
+$("trxCancel").onclick = () => { $("trxModal").hidden = true; trxTarget = null; };
+$("trxClose").onclick = () => { $("trxModal").hidden = true; trxTarget = null; };
+$("trxModal").addEventListener("mousedown", e => { if (e.target === $("trxModal")) { $("trxModal").hidden = true; trxTarget = null; } });
+$("trxModal").addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); $("trxModal").hidden = true; trxTarget = null; }
+    else if (e.key === "Tab") trapTab($("trxModal").querySelector(".modal-box"), e);
+});
 
 /* ---------- старт ---------- */
 loadReq();

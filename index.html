@@ -385,6 +385,23 @@
     </div>
 </div>
 
+<!-- ====== транскрибация фрагмента (офлайн-распознавание) ====== -->
+<div id="trxModal" class="modal" hidden>
+    <div class="modal-box">
+        <div class="modal-head">
+            <h2>Транскрибация фрагмента</h2>
+            <button id="trxClose" class="icon-x" title="Закрыть (Esc)" aria-label="Закрыть"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        </div>
+        <p class="muted">Проверьте и поправьте текст, затем вставьте его в блок.</p>
+        <textarea id="trxText" rows="8" style="width:100%; box-sizing:border-box; font-size:14px"></textarea>
+        <div class="row ask-row">
+            <span class="spacer"></span>
+            <button id="trxCancel">Отмена</button>
+            <button id="trxOk" class="accent">Вставить в блок</button>
+        </div>
+    </div>
+</div>
+
 <!-- ====== палитра команд (Ctrl+K) ====== -->
 <div id="cmdPalette" class="modal" hidden>
     <div class="modal-box cp-box">

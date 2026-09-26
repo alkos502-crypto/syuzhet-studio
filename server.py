@@ -16,6 +16,7 @@ import sys
 import tempfile
 import threading
 import webbrowser
+from io import BytesIO
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -23,6 +24,7 @@ NAMES_FILE = os.path.join(ROOT, "names.json")
 ROLES = ("fioReporter", "fioCam", "fioEditor")
 MAX_PER_ROLE = 200
 MAX_BODY = 64 * 1024
+MAX_AUDIO = 30 * 1024 * 1024
 VKEY = "_v"
 
 # ThreadingHTTPServer обслуживает запросы в потоках; версия «прочитал — сравнил —
@@ -103,6 +105,27 @@ def save_names(clean, client_v):
         return cur_v + 1, None
 
 
+# ---------- офлайн-распознавание речи (faster-whisper) ----------
+# Устанавливается отдельно:  pip install faster-whisper
+# Модель (по умолчанию base) скачается при первом вызове — нужен интернет один раз.
+WHISPER_MODEL = os.environ.get("SS_WHISPER_MODEL", "base")
+_whisper = {"model": None, "name": None}
+
+
+def transcribe_wav(data):
+    """WAV-байты фрагмента -> текст (русский). Бросает RuntimeError с понятной причиной."""
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError:
+        raise RuntimeError("faster-whisper не установлен: выполните на сервере "
+                           "'pip install faster-whisper' и перезапустите его")
+    if _whisper["model"] is None or _whisper["name"] != WHISPER_MODEL:
+        _whisper["model"] = WhisperModel(WHISPER_MODEL, device="auto", compute_type="int8")
+        _whisper["name"] = WHISPER_MODEL
+    segments, _info = _whisper["model"].transcribe(BytesIO(data), language="ru", vad_filter=True)
+    return " ".join(seg.text.strip() for seg in segments).strip()
+
+
 class Handler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"   # keep-alive; все ответы с Content-Length
 
@@ -158,20 +181,38 @@ class Handler(SimpleHTTPRequestHandler):
                    {"Cache-Control": "no-store", "ETag": etag})
 
     # ---------- POST ----------
-    def _read_body(self):
+    def _read_body(self, limit=MAX_BODY):
         """Всегда дочитывает тело (иначе keep-alive «поплывёт»).
         Возвращает (body, None) или (None, (code, obj))."""
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             length = -1
-        if length < 0 or length > MAX_BODY:
+        if length < 0 or length > limit:
             self.close_connection = True
             return None, (400, {"error": "некорректный размер запроса"})
         return (self.rfile.read(length) if length else b""), None
 
+    def _transcribe(self, body):
+        """POST /transcribe: WAV-фрагмент -> текст (офлайн, faster-whisper)."""
+        ctype = (self.headers.get("Content-Type") or "").lower()
+        if "audio/wav" not in ctype:
+            return self._json(415, {"error": "подайте WAV (audio/wav)"})
+        if not self.headers.get("X-Requested-With"):
+            return self._json(415, {"error": "запись только из интерфейса Сюжет-Студии"})
+        try:
+            text = transcribe_wav(body)
+        except Exception as e:
+            return self._json(500, {"error": str(e)})
+        return self._json(200, {"ok": True, "text": text})
+
     def do_POST(self):
         path = self.path.split("?", 1)[0].lstrip("/")
+        if path == "transcribe":
+            body, err = self._read_body(MAX_AUDIO)
+            if err:
+                return self._json(*err)
+            return self._transcribe(body)
         body, err = self._read_body()
         if err:
             return self._json(*err)
